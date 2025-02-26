@@ -44,13 +44,13 @@ syntax "[AExp|" lfp_aexp "]" : term
 
 macro_rules
   | `([AExp| $x:num]) => `(AExp.Num $x)
-  | `([AExp| $x:ident]) => `(@id AExp $x)
+  | `([AExp| $x:ident]) => `(AExp.Var $(Lean.quote (toString x.getId)))
   | `([AExp| $x:str]) => `(AExp.Var $x)
   | `([AExp| $x:lfp_aexp + $y:lfp_aexp]) => `([AExp| $x].Plus [AExp| $y])
   | `([AExp| $x:lfp_aexp - $y:lfp_aexp]) => `([AExp| $x].Minus [AExp| $y])
   | `([AExp| $x:lfp_aexp * $y:lfp_aexp]) => `([AExp| $x].Mult [AExp| $y])
   | `([AExp| ($x:lfp_aexp)]) => `([AExp| $x])
-  | `([AExp| [$x:term] ]) => `($x)
+  | `([AExp| [$x:term] ]) => `(@id AExp $x)
 
 
 namespace Playground
@@ -60,11 +60,11 @@ def X: String := "X"
 def Y: String := "Y"
 def Z: String := "z"
 
-def E1 := [AExp| Z * 3 + 2 * "Z" + W]
-def E2 := [AExp| E1 * E1]
+def E1 := [AExp| [Z] - Z * 3 + 2 * T + W]
+def E2 := [AExp| [E1] * [E1]]
 
 
-example: E1 = Z * 3 + 2 * "Z" + W := by
+example: E1 = "z" - "Z" * 3 + 2 * "T" + W := by
   eq_refl
 
 
@@ -110,7 +110,7 @@ macro_rules
   | `([BExp| $x:lfp_bexp && $y:lfp_bexp]) => `(BExp.And [BExp|$x] [BExp|$y])
   | `([BExp| ~ $x:lfp_bexp]) => `(BExp.Not [BExp|$x])
   | `([BExp| ($x:lfp_bexp)]) => `([BExp| $x])
-  | `([BExp| [$x:term] ]) => `($x)
+  | `([BExp| [$x:term] ]) => `(@id BExp $x)
 
 
 namespace Playground
