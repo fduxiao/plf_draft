@@ -9,6 +9,7 @@ inductive AExp: Type where
   | Plus (a1 a2 : AExp)
   | Minus (a1 a2 : AExp)
   | Mult (a1 a2 : AExp)
+  deriving Repr
 
 
 instance {n: Nat}: OfNat AExp n where
@@ -82,3 +83,45 @@ inductive BExp : Type where
   | Le (a1 a2 : AExp)
   | Not (b : BExp)
   | And (b1 b2 : BExp)
+  deriving Repr
+
+
+instance: Coe Bool BExp where
+  coe b := match b with
+  | true => .True
+  | false => .False
+
+
+declare_syntax_cat lfp_bexp
+syntax "true" : lfp_bexp
+syntax "false" : lfp_bexp
+syntax lfp_aexp "==" lfp_aexp : lfp_bexp
+syntax lfp_aexp "<=" lfp_aexp : lfp_bexp
+syntax:50 lfp_bexp:50 "&&" lfp_bexp:51 : lfp_bexp
+syntax:60 "~" lfp_bexp:60 : lfp_bexp
+syntax "(" lfp_bexp ")" : lfp_bexp
+syntax "[" term "]" : lfp_bexp
+syntax "[BExp|" lfp_bexp "]" : term
+
+
+macro_rules
+  | `([BExp| true]) => `(BExp.True)
+  | `([BExp| false]) => `(BExp.False)
+  | `([BExp| $x:lfp_aexp == $y:lfp_aexp]) => `(BExp.Eq [AExp|$x] [AExp|$y])
+  | `([BExp| $x:lfp_aexp <= $y:lfp_aexp]) => `(BExp.Le [AExp|$x] [AExp|$y])
+  | `([BExp| $x:lfp_bexp && $y:lfp_bexp]) => `(BExp.And [BExp|$x] [BExp|$y])
+  | `([BExp| ~ $x:lfp_bexp]) => `(BExp.Not [BExp|$x])
+  | `([BExp| ($x:lfp_bexp)]) => `([BExp| $x])
+  | `([BExp| [$x:term] ]) => `($x)
+
+
+namespace Playground
+def B1 := [BExp| 4 <= 2 && ~3 == 4 + 3 && ~true]
+def B2 := BExp.And (
+    BExp.And (BExp.Le 4 2) (BExp.Not (BExp.Eq 3 ((4: AExp) + 3)))
+  ) (BExp.Not .True)
+
+example: B1 = B2 := by
+  eq_refl
+
+end Playground
