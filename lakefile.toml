@@ -1,0 +1,6 @@
+name = "plf"
+version = "0.1.0"
+defaultTargets = ["PLF"]
+
+[[lean_lib]]
+name = "PLF"
