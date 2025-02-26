@@ -1,8 +1,6 @@
 import PLF.Map
 
 
-def State := TotalMap Nat
-
 inductive AExp: Type where
   | Num (n : Nat)
   | Var (x : String)
@@ -57,9 +55,9 @@ macro_rules
 
 namespace Playground
 
-def W: AExp := "W"
-def X: AExp := "X"
-def Y: AExp := "Y"
+def W: String := "W"
+def X: String := "X"
+def Y: String := "Y"
 def Z: String := "z"
 
 def E1 := [AExp| Z * 3 + 2 * "Z" + W]
@@ -122,6 +120,69 @@ def B2 := BExp.And (
   ) (BExp.Not .True)
 
 example: B1 = B2 := by
+  eq_refl
+
+end Playground
+
+
+abbrev State := TotalMap Nat
+def State.empty: State := TotalMap.empty 0
+def State.update: State -> String -> Nat -> State := TotalMap.update
+
+
+def State.aeval (st: State) (a: AExp): Nat := match a with
+  | .Num n => n
+  | .Var x => st x
+  | .Plus x1 x2 => st.aeval x1 + st.aeval x2
+  | .Minus x1 x2 => st.aeval x1 - st.aeval x2
+  | .Mult x1 x2 => st.aeval x1 * st.aeval x2
+
+
+def State.beval (st: State) (b: BExp): Bool := match b with
+  | .True => True
+  | .False => False
+  | .Eq a1 a2 => (st.aeval a1) == (st.aeval a2)
+  | .Le a1 a2 => (st.aeval a1) <= (st.aeval a2)
+  | .And b1 b2 => (st.beval b1) && (st.beval b2)
+  | .Not b => (st.beval b).not
+
+
+declare_syntax_cat lfp_state
+syntax term: lfp_state
+syntax "state![" "]": term
+syntax "state![" lfp_state "]": term
+syntax "_" "=>" term: lfp_state
+syntax term "=>" term ";" lfp_state: lfp_state
+syntax term "=>" term: lfp_state
+
+macro_rules
+  | `(state![ ]) =>`(State.empty)
+  | `(state![ $m:term ]) =>`($m)
+  | `(state![ _ => $v:term ]) => `(State.empty $v)
+  | `(state![ $x:term => $v:term ; $m:lfp_state ]) => `(state![$m].update $x $v)
+  | `(state![ $x:term => $v:term ]) => `(State.empty.update $x $v)
+
+
+declare_syntax_cat lfp_imp
+syntax lfp_aexp: lfp_imp
+syntax lfp_bexp: lfp_imp
+syntax "<{" lfp_imp "}>": term
+
+
+macro_rules
+  | `(<{ $x:lfp_aexp }>) => `([AExp| $x])
+  | `(<{ $x:lfp_bexp }>) => `([BExp| $x])
+
+
+namespace Playground
+example: state![X => 5].aeval <{ 3 + (X * 2) }> = 13 := by
+  eq_refl
+
+example: state![X => 5; Y => 4].aeval <{ Z + (X * Y)}> = 20 := by
+  eq_refl
+
+
+example: state![X => 5].beval <{ true && ~(X <= 4) }> = .true := by
   eq_refl
 
 end Playground
