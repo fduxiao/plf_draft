@@ -130,6 +130,7 @@ def State.empty: State := TotalMap.empty 0
 def State.update: State -> String -> Nat -> State := TotalMap.update
 
 
+@[simp]
 def State.aeval (st: State) (a: AExp): Nat := match a with
   | .Num n => n
   | .Var x => st x
@@ -138,6 +139,7 @@ def State.aeval (st: State) (a: AExp): Nat := match a with
   | .Mult x1 x2 => st.aeval x1 * st.aeval x2
 
 
+@[simp]
 def State.beval (st: State) (b: BExp): Bool := match b with
   | .True => True
   | .False => False
@@ -235,6 +237,7 @@ def Imp.loop := <{
 }>
 
 
+@[simp]
 def State.exec_no_while (st: State) (c: Imp): State :=
   match c with
   | .Skip => st
@@ -378,3 +381,115 @@ theorem Imp.loop.never_stops {st1 st2: State}:
     | @BWhileTrue b c st1 st2 st3 HT H12 H23 IH1 IH2 =>
       apply IH2
       apply E
+
+
+section StackCalculator
+
+inductive SInstr : Type where
+  | SPush (n: Nat)
+  | SLoad (x: String)
+  | SPlus
+  | SMinus
+  | SMult
+  deriving Repr
+
+
+@[simp]
+def State.s_execute (st: State) (stack: List Nat) (prog: List SInstr)
+  : List Nat := match prog with
+  | .nil => stack
+  | .cons x xs =>
+    match x with
+    | .SPush n => st.s_execute (n :: stack) xs
+    | .SLoad s => st.s_execute (st s :: stack) xs
+    | .SPlus => match stack with
+      | [] | [_] => st.s_execute stack xs
+      | y1 :: y2 :: ys => st.s_execute ((y2 + y1) :: ys) xs
+    | .SMinus => match stack with
+      | [] | [_] => st.s_execute stack xs
+      | y1 :: y2 :: ys => st.s_execute ((y2 - y1) :: ys) xs
+    | .SMult => match stack with
+      | [] | [_] => st.s_execute stack xs
+      | y1 :: y2 :: ys => st.s_execute ((y2 * y1) :: ys) xs
+
+
+example: State.empty.s_execute []
+  [.SPush 5, .SPush 3, .SPush 1, .SMinus] = [2, 5] := by
+    eq_refl
+
+example: state!["X" => 3].s_execute [3, 4]
+       [.SPush 4, .SLoad "X", .SMult, .SPlus]
+   = [15, 4] := by
+    eq_refl
+
+@[simp]
+def AExp.s_compile (e : AExp) : List SInstr :=
+  match e with
+  | .Num n => [.SPush n]
+  | .Var s => [.SLoad s]
+  | .Plus e1 e2 => e1.s_compile ++ e2.s_compile ++ [.SPlus]
+  | .Minus e1 e2 => e1.s_compile ++ e2.s_compile ++ [.SMinus]
+  | .Mult e1 e2 => e1.s_compile ++ e2.s_compile ++ [.SMult]
+
+
+example: <{ X - (2 * Y) }>.s_compile
+  = [.SLoad "X", .SPush 2, .SLoad "Y", .SMult, .SMinus] := by
+    eq_refl
+
+
+theorem List.cases2 {A} {motive: List A -> Prop}:
+  (motive []) ->
+  (forall x, motive [x]) ->
+  (forall x1 x2 xs, motive $ x1 :: x2 :: xs) ->
+  forall {l}, motive l := by
+    intros H0 H1 H2
+    intros l
+    cases l with
+    | nil =>  exact H0
+    | cons x1 xs =>
+      cases xs with
+      | nil =>
+        apply H1
+      | cons x2 xs =>
+        apply H2
+
+
+theorem AExp.execute_app {st: State} {p1 p2 stack}:
+  st.s_execute stack (p1 ++ p2)
+  = st.s_execute (st.s_execute stack p1) p2 := by
+    revert stack
+    induction p1 with
+    | nil =>
+      simp
+    | cons x xs IHxs =>
+      intros stack
+      cases x with
+      | SPush n | SLoad =>
+        simp
+        apply IHxs
+      | SPlus | SMinus | SMult =>
+        apply stack.cases2 <;> simp <;> intros <;> apply IHxs
+
+
+theorem AExp.s_compile.correct_aux {st: State} {e stack}:
+  st.s_execute stack e.s_compile = st.aeval e :: stack := by
+    revert stack
+    induction e with
+    | Num n | Var s =>
+      simp
+    | Plus n1 n2 IH1 IH2 | Minus n1 n2 IH1 IH2 | Mult n1 n2 IH1 IH2 =>
+      intros stack
+      simp
+      rewrite [AExp.execute_app]
+      rewrite [AExp.execute_app]
+      rewrite [IH1]
+      rewrite [IH2]
+      simp
+
+
+theorem AExp.s_compile.correct {st: State} e:
+  st.s_execute [] e.s_compile = [ st.aeval e ]
+  := AExp.s_compile.correct_aux (stack := [])
+
+
+end StackCalculator
