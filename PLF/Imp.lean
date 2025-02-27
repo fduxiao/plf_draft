@@ -93,10 +93,10 @@ instance: Coe Bool BExp where
 declare_syntax_cat lfp_bexp
 syntax "true" : lfp_bexp
 syntax "false" : lfp_bexp
-syntax lfp_aexp "==" lfp_aexp : lfp_bexp
-syntax lfp_aexp "<=" lfp_aexp : lfp_bexp
-syntax:50 lfp_bexp:50 "&&" lfp_bexp:51 : lfp_bexp
-syntax:60 "~" lfp_bexp:60 : lfp_bexp
+syntax:30 lfp_aexp "==" lfp_aexp : lfp_bexp
+syntax:30 lfp_aexp "<=" lfp_aexp : lfp_bexp
+syntax:20 lfp_bexp:20 "&&" lfp_bexp:21 : lfp_bexp
+syntax:25 "~" lfp_bexp:25 : lfp_bexp
 syntax "(" lfp_bexp ")" : lfp_bexp
 syntax "[" term "]" : lfp_bexp
 syntax "[BExp|" lfp_bexp "]" : term
@@ -186,3 +186,195 @@ example: state![X => 5].beval <{ true && ~(X <= 4) }> = .true := by
   eq_refl
 
 end Playground
+
+
+inductive Imp : Type where
+  | Skip | Asgn (x: String) (a: AExp)
+  | Seq (c1 c2: Imp) | If (b: BExp) (c1 c2: Imp)
+  | While (b: BExp) (c: Imp)
+  deriving Repr
+
+syntax:100 "skip": lfp_imp
+syntax:100 ident ":=" lfp_aexp:15 : lfp_imp
+syntax:100 "[" term "]" ":=" lfp_aexp:15 : lfp_imp
+syntax:10 lfp_imp ";" lfp_imp : lfp_imp
+syntax:11 "if" lfp_bexp:5 "then" lfp_imp:5 "else" lfp_imp:5 "end": lfp_imp
+syntax:11 "while" lfp_bexp:5 "do" lfp_imp:5 "end": lfp_imp
+syntax:2 "[" term "]": lfp_imp
+
+
+macro_rules
+  | `(<{ skip }>) => `(Imp.Skip)
+  | `(<{ $v:ident := $y:lfp_aexp }>) => `(Imp.Asgn $(Lean.quote (toString v.getId)) [AExp|$y])
+  | `(<{ [$t] := $y:lfp_aexp }>) => `(Imp.Asgn $t [AExp|$y])
+  | `(<{ $c1 ; $c2 }>) => `(Imp.Seq <{$c1}> <{$c2}>)
+  | `(<{ if $b then $t else $f end }>) => `(Imp.If [BExp|$b] <{$t}> <{$f}>)
+  | `(<{ while $b do $t end }>) => `(Imp.While [BExp|$b] <{$t}>)
+  | `(<{ [$t] }>) => `($t)
+
+
+namespace Playground
+
+def fact_in_lean: Imp := <{
+  Z := X;
+  Y := 1;
+  while (~Z == 0) do
+    Y := Y * Z;
+    Z := Z - 1
+  end
+}>
+
+
+end Playground
+
+
+def Imp.loop := <{
+  while true do
+    skip
+  end
+}>
+
+
+def State.exec_no_while (st: State) (c: Imp): State :=
+  match c with
+  | .Skip => st
+  | .Asgn x v => st.update x (st.aeval v)
+  | .Seq c1 c2 => (st.exec_no_while c1).exec_no_while c2
+  | .If b c1 c2 =>
+    if st.beval b then st.exec_no_while c1 else st.exec_no_while c2
+  | .While _ _ => st
+
+
+inductive Imp.BigStep: Imp -> State -> State -> Prop where
+  | BSkip {st: State}: Imp.Skip.BigStep st st
+  | BAsgn {st: State} {a n x}:
+    st.aeval a = n ->
+    (Imp.Asgn x a).BigStep st state![x=> n; st]
+  | BSeq {c1 c2: Imp} {st1 st2 st3: State}:
+    c1.BigStep st1 st2 ->
+    c2.BigStep st2 st3 ->
+    (c1.Seq c2).BigStep st1 st3
+  | BIfTrue {b c1 c2} {st1 st2: State}:
+    st1.beval b = .true ->
+    c1.BigStep st1 st2 ->
+    (Imp.If b c1 c2).BigStep st1 st2
+  | BIfFalse {b c1 c2} {st1 st2: State}:
+    st1.beval b = .false ->
+    c2.BigStep st1 st2 ->
+    (Imp.If b c1 c2).BigStep st1 st2
+  | BWhileFalse {b c} {st: State}:
+    st.beval b = .false ->
+    (Imp.While b c).BigStep st st
+  | BWhileTrue {b c} {st1 st2 st3: State}:
+    st1.beval b = .true ->
+    c.BigStep st1 st2 ->
+    (Imp.While b c).BigStep st2 st3 ->
+    (Imp.While b c).BigStep st1 st3
+
+
+macro s1:term:60 "=[" c:lfp_imp "]=>" s2:term:60 : term => `(Imp.BigStep <{$c}> $s1 $s2)
+
+
+example: State.empty =[
+  X := 2;
+  if (X <= 1)then
+    Y := 3
+  else
+    Z := 4
+  end
+]=> state!["Z" => 4; "X" => 2] := by
+  apply Imp.BigStep.BSeq (st2 := state!["X" => 2])
+  . apply Imp.BigStep.BAsgn
+    eq_refl
+  . apply Imp.BigStep.BIfFalse
+    . eq_refl
+    . apply Imp.BigStep.BAsgn
+      eq_refl
+
+
+theorem Imp.BigStep.deterministic {c} {st1 st2 st3: State}:
+  st1 =[ [c] ]=> st2 ->
+  st1 =[ [c] ]=> st3 ->
+  st2 = st3 := by
+    intros H12
+    revert st3
+    induction H12 with
+    | BSkip =>
+      intros st3 H13
+      cases H13
+      eq_refl
+    | BAsgn E1 =>
+      intros st3 H13
+      cases H13 with
+      | BAsgn E2 =>
+        rewrite [E1] at E2
+        subst E2
+        eq_refl
+    | @BSeq c1 c2 st1 s st2 E1 E2 IH1 IH2 =>
+      intros st3 H13
+      cases H13 with
+      | @BSeq _ _ _ t _ H1t Ht3 =>
+        specialize IH1 H1t
+        apply IH2
+        rewrite [IH1]
+        apply Ht3
+    | @BIfTrue b c1 c2 st1 st2 HT H12 IH =>
+      intros st3 H13
+      cases H13 with
+      | BIfTrue _ H13 =>
+        apply IH
+        apply H13
+      | BIfFalse E _ =>
+        rewrite [E] at HT
+        contradiction
+    | @BIfFalse b c1 c2 st1 st2 HF H12 IH =>
+      intros st3 H13
+      cases H13 with
+      | BIfTrue E _ =>
+        rewrite [E] at HF
+        contradiction
+      | BIfFalse _ H13 =>
+        apply IH
+        apply H13
+    | @BWhileFalse b c st HF=>
+      intros st3 H13
+      cases H13 with
+      | BWhileFalse =>
+        eq_refl
+      | BWhileTrue HT =>
+        rewrite [HF] at HT
+        contradiction
+    | @BWhileTrue b c st1 s st2 HT H12 H23 IH1 IH2 =>
+      intros st3 H13
+      cases H13 with
+      | BWhileFalse HF =>
+        rewrite [HF] at HT
+        contradiction
+      | @BWhileTrue _ _ _ t _ _ H1t Ht3  =>
+        specialize IH1 H1t
+        apply IH2
+        rewrite [IH1]
+        apply Ht3
+
+
+theorem Imp.loop.never_stops {st1 st2: State}:
+  Not (st1 =[ [loop] ]=> st2) := by
+    generalize E: loop = t
+    intros H
+    induction H with
+    | BSkip =>
+      contradiction
+    | BAsgn =>
+      contradiction
+    | BSeq =>
+      contradiction
+    | BIfTrue =>
+      contradiction
+    | BIfFalse =>
+      contradiction
+    | @BWhileFalse b c st HF =>
+      cases E
+      contradiction
+    | @BWhileTrue b c st1 st2 st3 HT H12 H23 IH1 IH2 =>
+      apply IH2
+      apply E
