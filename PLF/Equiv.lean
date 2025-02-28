@@ -557,3 +557,287 @@ example:
           intros st
           simp
         . apply @Imp.equiv.refl
+
+
+abbrev Transformation (A: Type) := A -> A
+
+class Transformation.Sound
+  {A: Type}
+  (t: Transformation A)
+  (R: outParam (Relation A))
+where
+  sound {a: A}: R a (t a)
+
+
+def Transformation.sound {A: Type} {t: Transformation A} {R: Relation A}
+  [inst: t.Sound R] {a: A}: R a (t a) := inst.sound
+
+def Relation.sound {A: Type} {t: Transformation A} {R: Relation A}
+  [inst: t.Sound R] {a: A} : R a (t a) := inst.sound
+
+
+abbrev AExp.transformation := Transformation AExp
+abbrev BExp.transformation := Transformation BExp
+abbrev Imp.transformation := Transformation Imp
+
+
+@[simp]
+def AExp.fold_constants: AExp.transformation := fun a =>
+  match a with
+  | .Num n => .Num n
+  | .Var x => .Var x
+  | .Plus a1 a2 =>
+    match (a1.fold_constants, a2.fold_constants) with
+    | (.Num n1, .Num n2) => .Num (n1 + n2)
+    | (b1, b2) => b1 + b2
+  | .Minus a1 a2 =>
+    match (a1.fold_constants, a2.fold_constants) with
+    | (.Num n1, .Num n2) => .Num (n1 - n2)
+    | (b1, b2) => b1 - b2
+  | .Mult a1 a2 =>
+    match (a1.fold_constants, a2.fold_constants) with
+    | (.Num n1, .Num n2) => .Num (n1 * n2)
+    | (b1, b2) => b1 * b2
+
+example : <{A| (1 + 2) * X }>.fold_constants = <{A| 3 * X }> :=
+  by
+  eq_refl
+
+example : <{A| X - ((0 * 6) + Y) }>.fold_constants = <{A| X - (0 + Y) }> :=
+  by
+  eq_refl
+
+
+instance: AExp.fold_constants.Sound AExp.equiv where
+  sound {a} := by
+    intros st
+    induction a with (try eq_refl)
+    | Plus a1 a2 IHa1 IHa2 =>
+      simp
+      generalize E1: a1.fold_constants = t1
+      generalize E2: a2.fold_constants = t2
+      cases t1 with
+      | _ => cases t2 with
+        | _ =>
+          simp
+          rewrite [E1] at IHa1
+          rewrite [E2] at IHa2
+          rewrite [IHa1]
+          rewrite [IHa2]
+          eq_refl
+    | Minus a1 a2 IHa1 IHa2 =>
+      simp
+      generalize E1: a1.fold_constants = t1
+      generalize E2: a2.fold_constants = t2
+      cases t1 with
+      | _ => cases t2 with
+        | _ =>
+          simp
+          rewrite [E1] at IHa1
+          rewrite [E2] at IHa2
+          rewrite [IHa1]
+          rewrite [IHa2]
+          eq_refl
+    | Mult a1 a2 IHa1 IHa2 =>
+      simp
+      generalize E1: a1.fold_constants = t1
+      generalize E2: a2.fold_constants = t2
+      cases t1 with
+      | _ => cases t2 with
+        | _ =>
+          simp
+          rewrite [E1] at IHa1
+          rewrite [E2] at IHa2
+          rewrite [IHa1]
+          rewrite [IHa2]
+          eq_refl
+
+
+@[simp]
+def BExp.fold_constants: BExp.transformation := fun b =>
+  match b with
+  | .True => .True
+  | .False => .False
+  | .Eq a1 a2 => match (a1.fold_constants, a2.fold_constants) with
+    | (.Num n1, .Num n2) => n1.beq n2
+    | (b1, b2) => .Eq b1 b2
+  | .Le a1 a2 => match (a1.fold_constants, a2.fold_constants) with
+    | (.Num n1, .Num n2) => n1.ble n2
+    | (b1, b2) => .Le b1 b2
+  | .And b1 b2 => match (b1.fold_constants, b2.fold_constants) with
+    | (.True, .True) => .True
+    | (.True, .False) => .False
+    | (.False, .True) => .False
+    | (.False, .False) => .False
+    | (c1, c2) => c1.And c2
+  | .Not b => match b.fold_constants with
+    | .True => .False
+    | .False => .True
+    | c => c.Not
+
+example: <{B| true && ~(false && true) }>.fold_constants = .True := by
+  eq_refl
+
+example: <{B| (X == Y) && (0 == (2 - (1 + 1))) }>.fold_constants
+  = <{B| (X == Y) && true }>
+  := by
+  eq_refl
+
+
+instance: BExp.fold_constants.Sound BExp.equiv where
+  sound {b} := by
+    intros st
+    induction b with (try eq_refl)
+    | Eq a1 a2=>
+      simp
+      generalize E1: a1.fold_constants = a1'
+      generalize E2: a2.fold_constants = a2'
+
+      have R1: st.aeval a1 = st.aeval a1' := by
+        subst E1
+        apply AExp.fold_constants.sound
+
+      have R2: st.aeval a2 = st.aeval a2' := by
+        subst E2
+        apply AExp.fold_constants.sound
+
+      rewrite [R1, R2]
+
+      cases a1' <;> cases a2' <;> try eq_refl
+      simp
+      split <;> simp <;> (try rewrite [<-Nat.beq_eq]) <;> assumption
+    | Le a1 a2=>
+      simp
+      generalize E1: a1.fold_constants = a1'
+      generalize E2: a2.fold_constants = a2'
+
+      have R1: st.aeval a1 = st.aeval a1' := by
+        subst E1
+        apply AExp.fold_constants.sound
+
+      have R2: st.aeval a2 = st.aeval a2' := by
+        subst E2
+        apply AExp.fold_constants.sound
+
+      rewrite [R1, R2]
+      cases a1' <;> cases a2' <;> try eq_refl
+      simp
+      split <;> simp <;> (try rewrite [<-Nat.ble_eq]) <;> assumption
+    | And b1 b2 IHb1 IHb2 =>
+      simp
+      rewrite [IHb1, IHb2]
+      generalize b1.fold_constants = b1'
+      generalize b2.fold_constants = b2'
+      cases b1' <;> cases b2' <;> eq_refl
+    | Not b IHb =>
+      simp
+      rewrite [IHb]
+      generalize E: b.fold_constants = b'
+      cases b' <;> simp -- it contains simp
+
+
+@[simp]
+def Imp.fold_constants: Imp.transformation := fun c =>
+  match c with
+  | <{ skip }> => <{ skip }>
+  | <{ [x] := [a] }> => <{ [x] := [a.fold_constants] }>
+  | <{ c1 ; c2 }> =>
+      <{ c1.fold_constants ; c2.fold_constants }>
+  | <{ if b then c1 else c2 end }> =>
+      match b.fold_constants with
+      | <{true}> => c1.fold_constants
+      | <{false}> => c2.fold_constants
+      | b' => <{ if b' then c1.fold_constants
+                       else c2.fold_constants end}>
+  | <{ while b do c end }> =>
+      match b.fold_constants with
+      | <{true}> => <{ while true do skip end }>
+      | <{false}> => <{ skip }>
+      | b' => <{ while b' do c.fold_constants end }>
+
+
+example:
+  <{  X := 4 + 5;
+      Y := X - 3;
+      if (X - Y) == (2 + 4)
+      then skip
+      else Y := 0 end;
+
+      if 0 <= (4 - (2 + 1))
+      then Y := 0
+      else skip end;
+
+      while Y == 0 do
+        X := X + 1
+      end }>.fold_constants
+  = <{  X := 9;
+        Y := X - 3;
+        if (X - Y) == 6
+        then skip
+        else Y := 0 end;
+
+        Y := 0;
+        while Y == 0 do
+          X := X + 1
+        end  }>
+  := by
+    eq_refl
+
+
+instance: Imp.fold_constants.Sound Imp.equiv where
+  sound {c} := by
+    induction c with
+    | Skip =>
+      simp
+      apply @Imp.equiv.refl
+    | Asgn x a =>
+      simp
+      apply Imp.Asgn.congruence
+      apply AExp.fold_constants.sound
+    | Seq c1 c2 IHc1 IHc2 =>
+      apply Imp.Seq.congruence
+      . apply IHc1
+      . apply IHc2
+    | If b c1 c2 IHc1 IHc2 =>
+      have S: b.equiv b.fold_constants := BExp.equiv.sound
+      generalize E: b.fold_constants = b'
+
+      cases b' with (simp <;> rewrite[E] <;> simp)
+      | True =>
+        apply Imp.equiv.trans
+        . apply Imp.if_true
+          rewrite [E] at S
+          assumption
+        . apply IHc1
+      | False =>
+        apply Imp.equiv.trans
+        . apply Imp.if_false
+          rewrite [E] at S
+          assumption
+        . apply IHc2
+      | _ =>
+        apply Imp.If.congruence
+        . rewrite [<-E]
+          apply S
+        . apply IHc1
+        . apply IHc2
+    | While b c IHc =>
+      have S: b.equiv b.fold_constants := BExp.equiv.sound
+      generalize E: b.fold_constants = b'
+      cases b' with (simp <;> rewrite[E] <;> simp)
+      | True =>
+        apply Imp.while_true
+        rewrite [E] at S
+        assumption
+      | False =>
+        apply Imp.while_false
+        rewrite [E] at S
+        simp
+        intros st
+        rewrite [S]
+        eq_refl
+      | _ =>
+        apply Imp.While.congruence
+        . rewrite [<-E]
+          apply S
+        . apply IHc
