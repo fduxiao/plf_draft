@@ -141,8 +141,8 @@ def State.aeval (st: State) (a: AExp): Nat := match a with
 def State.beval (st: State) (b: BExp): Bool := match b with
   | .True => True
   | .False => False
-  | .Eq a1 a2 => (st.aeval a1) == (st.aeval a2)
-  | .Le a1 a2 => (st.aeval a1) <= (st.aeval a2)
+  | .Eq a1 a2 => (st.aeval a1).beq  (st.aeval a2)
+  | .Le a1 a2 => (st.aeval a1).ble (st.aeval a2)
   | .And b1 b2 => (st.beval b1) && (st.beval b2)
   | .Not b => (st.beval b).not
 
