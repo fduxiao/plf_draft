@@ -50,7 +50,7 @@ macro_rules
   | `([AExp| $x:lfp_aexp - $y:lfp_aexp]) => `([AExp| $x].Minus [AExp| $y])
   | `([AExp| $x:lfp_aexp * $y:lfp_aexp]) => `([AExp| $x].Mult [AExp| $y])
   | `([AExp| ($x:lfp_aexp)]) => `([AExp| $x])
-  | `([AExp| [$x:term] ]) => `(@id AExp $x)
+  | `([AExp| [$x:term] ]) => `((($x): AExp))
 
 
 namespace Playground
@@ -91,8 +91,6 @@ instance: Coe Bool BExp where
 
 
 declare_syntax_cat lfp_bexp
-syntax "true" : lfp_bexp
-syntax "false" : lfp_bexp
 syntax:30 lfp_aexp "==" lfp_aexp : lfp_bexp
 syntax:30 lfp_aexp "<=" lfp_aexp : lfp_bexp
 syntax:20 lfp_bexp:20 "&&" lfp_bexp:21 : lfp_bexp
@@ -103,18 +101,16 @@ syntax "[BExp|" lfp_bexp "]" : term
 
 
 macro_rules
-  | `([BExp| true]) => `(BExp.True)
-  | `([BExp| false]) => `(BExp.False)
   | `([BExp| $x:lfp_aexp == $y:lfp_aexp]) => `(BExp.Eq [AExp|$x] [AExp|$y])
   | `([BExp| $x:lfp_aexp <= $y:lfp_aexp]) => `(BExp.Le [AExp|$x] [AExp|$y])
   | `([BExp| $x:lfp_bexp && $y:lfp_bexp]) => `(BExp.And [BExp|$x] [BExp|$y])
   | `([BExp| ~ $x:lfp_bexp]) => `(BExp.Not [BExp|$x])
   | `([BExp| ($x:lfp_bexp)]) => `([BExp| $x])
-  | `([BExp| [$x:term] ]) => `(@id BExp $x)
+  | `([BExp| [$x:term] ]) => `((($x): BExp))
 
 
 namespace Playground
-def B1 := [BExp| 4 <= 2 && ~3 == 4 + 3 && ~true]
+def B1 := [BExp| 4 <= 2 && ~3 == 4 + 3 && ~[true]]
 def B2 := BExp.And (
     BExp.And (BExp.Le 4 2) (BExp.Not (BExp.Eq 3 ((4: AExp) + 3)))
   ) (BExp.Not .True)
@@ -166,25 +162,25 @@ macro_rules
 
 
 declare_syntax_cat lfp_imp
-syntax lfp_aexp: lfp_imp
-syntax lfp_bexp: lfp_imp
+syntax "A|" lfp_aexp: lfp_imp
+syntax "B|" lfp_bexp: lfp_imp
 syntax "<{" lfp_imp "}>": term
 
 
 macro_rules
-  | `(<{ $x:lfp_aexp }>) => `([AExp| $x])
-  | `(<{ $x:lfp_bexp }>) => `([BExp| $x])
+  | `(<{A| $x:lfp_aexp }>) => `([AExp| $x])
+  | `(<{B| $x:lfp_bexp }>) => `([BExp| $x])
 
 
 namespace Playground
-example: state![X => 5].aeval <{ 3 + (X * 2) }> = 13 := by
+example: state![X => 5].aeval <{A| 3 + (X * 2) }> = 13 := by
   eq_refl
 
-example: state![X => 5; Y => 4].aeval <{ Z + (X * Y)}> = 20 := by
+example: state![X => 5; Y => 4].aeval <{A| Z + (X * Y)}> = 20 := by
   eq_refl
 
 
-example: state![X => 5].beval <{ true && ~(X <= 4) }> = .true := by
+example: state![X => 5].beval <{B| [true] && ~(X <= 4) }> = true := by
   eq_refl
 
 end Playground
@@ -202,7 +198,7 @@ syntax:100 "[" term "]" ":=" lfp_aexp:15 : lfp_imp
 syntax:10 lfp_imp ";" lfp_imp : lfp_imp
 syntax:11 "if" lfp_bexp:5 "then" lfp_imp:5 "else" lfp_imp:5 "end": lfp_imp
 syntax:11 "while" lfp_bexp:5 "do" lfp_imp:5 "end": lfp_imp
-syntax:2 "[" term "]": lfp_imp
+syntax term: lfp_imp
 
 
 macro_rules
@@ -212,7 +208,7 @@ macro_rules
   | `(<{ $c1 ; $c2 }>) => `(Imp.Seq <{$c1}> <{$c2}>)
   | `(<{ if $b then $t else $f end }>) => `(Imp.If [BExp|$b] <{$t}> <{$f}>)
   | `(<{ while $b do $t end }>) => `(Imp.While [BExp|$b] <{$t}>)
-  | `(<{ [$t] }>) => `($t)
+  | `(<{ $t:term }>) => `($t)
 
 
 namespace Playground
@@ -231,7 +227,7 @@ end Playground
 
 
 def Imp.loop := <{
-  while true do
+  while [true] do
     skip
   end
 }>
@@ -296,8 +292,8 @@ example: State.empty =[
 
 
 theorem Imp.BigStep.deterministic {c} {st1 st2 st3: State}:
-  st1 =[ [c] ]=> st2 ->
-  st1 =[ [c] ]=> st3 ->
+  st1 =[ c ]=> st2 ->
+  st1 =[ c ]=> st3 ->
   st2 = st3 := by
     intros H12
     revert st3
@@ -361,7 +357,7 @@ theorem Imp.BigStep.deterministic {c} {st1 st2 st3: State}:
 
 
 theorem Imp.loop.never_stops {st1 st2: State}:
-  Not (st1 =[ [loop] ]=> st2) := by
+  Not (st1 =[ loop ]=> st2) := by
     generalize E: loop = t
     intros H
     induction H with
@@ -432,7 +428,7 @@ def AExp.s_compile (e : AExp) : List SInstr :=
   | .Mult e1 e2 => e1.s_compile ++ e2.s_compile ++ [.SMult]
 
 
-example: <{ X - (2 * Y) }>.s_compile
+example: <{A| X - (2 * Y) }>.s_compile
   = [.SLoad "X", .SPush 2, .SLoad "Y", .SMult, .SMinus] := by
     eq_refl
 

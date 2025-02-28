@@ -1,6 +1,3 @@
-import Lean
-
-
 def TotalMap (A: Type) := String -> A
 abbrev PartialMap (A: Type) := TotalMap (Option A)
 
