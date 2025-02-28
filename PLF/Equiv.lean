@@ -17,7 +17,7 @@ example: <{A| X - X }>.equiv <{ 0 }> := by
   simp
 
 
-example: <{B| X - X == 0 }>.equiv <{B| [true] }> := by
+example: <{B| X - X == 0 }>.equiv <{B| true }> := by
   intros st
   simp
 
@@ -59,7 +59,7 @@ theorem Imp.skip_right {c: Imp}: <{ c; skip }>.equiv c := by
 
 
 theorem Imp.if_true_simple {c1 c2: Imp}:
-  <{ if [.True] then c1 else c2 end }>.equiv c1 := by
+  <{ if true then c1 else c2 end }>.equiv c1 := by
     intros st1 st2
     apply Iff.intro
     . intros H
@@ -75,7 +75,7 @@ theorem Imp.if_true_simple {c1 c2: Imp}:
 
 
 theorem Imp.if_true {b: BExp} {c1 c2: Imp}:
-  b.equiv .True -> <{ if [b] then c1 else c2 end }>.equiv c1 := by
+  b.equiv .True -> <{ if b then c1 else c2 end }>.equiv c1 := by
     intros H
     intros st1 st2
     apply Iff.intro
@@ -95,7 +95,7 @@ theorem Imp.if_true {b: BExp} {c1 c2: Imp}:
 
 
 theorem Imp.if_false {b: BExp} {c1 c2: Imp}:
-  b.equiv .False -> <{ if [b] then c1 else c2 end }>.equiv c2 := by
+  b.equiv .False -> <{ if b then c1 else c2 end }>.equiv c2 := by
     intros H
     intros st1 st2
     apply Iff.intro
@@ -115,7 +115,7 @@ theorem Imp.if_false {b: BExp} {c1 c2: Imp}:
 
 
 theorem Imp.swap_if_branches {b: BExp} {c1 c2: Imp}:
-  <{ if [b] then c1 else c2 end }>.equiv <{ if ~[b] then c2 else c1 end }>
+  <{ if b then c1 else c2 end }>.equiv <{ if ~b then c2 else c1 end }>
   := by
     intros st1 st2
     apply Iff.intro
@@ -168,8 +168,8 @@ theorem Imp.swap_if_branches {b: BExp} {c1 c2: Imp}:
 
 
 theorem Imp.while_false {b: BExp} {c: Imp}:
-  b.equiv .False ->
-  <{ while [b] do c end }>.equiv <{ skip }>
+  b.equiv false ->
+  <{ while b do c end }>.equiv <{ skip }>
   := by
     simp
     intros Hb st1 st2
@@ -189,11 +189,11 @@ theorem Imp.while_false {b: BExp} {c: Imp}:
 
 
 theorem Imp.while_true_nonterm {b: BExp} {c st1 st2}:
-  b.equiv .True -> Not ( st1 =[ while [b] do c end ]=> st2 )
+  b.equiv true -> Not ( st1 =[ while b do c end ]=> st2 )
   := by
     simp
     intros Hb
-    generalize E: <{ while [b] do c end }> = l
+    generalize E: <{ while b do c end }> = l
     intros contra
     induction contra with
     | BWhileTrue HT H12 H23 IH1 IH2 =>
@@ -208,8 +208,8 @@ theorem Imp.while_true_nonterm {b: BExp} {c st1 st2}:
 
 
 theorem Imp.while_true {b: BExp} {c}:
-  b.equiv .True ->
-  <{ while [b] do c end }>.equiv <{ while [.True] do skip end }>
+  b.equiv true ->
+  <{ while b do c end }>.equiv <{ while true do skip end }>
   := by
     simp
     intros Hb
@@ -227,8 +227,8 @@ theorem Imp.while_true {b: BExp} {c}:
 
 
 theorem Imp.loop_unrolling {b c}:
-    <{ while [b] do c end }>.equiv
-    <{ if [b] then c ; while [b] do c end else skip end }>
+    <{ while b do c end }>.equiv
+    <{ if b then c ; while b do c end else skip end }>
     := by
       intros st1 st2
       generalize E: st1.beval b = t

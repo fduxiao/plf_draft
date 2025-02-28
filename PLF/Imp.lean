@@ -97,6 +97,7 @@ syntax:20 lfp_bexp:20 "&&" lfp_bexp:21 : lfp_bexp
 syntax:25 "~" lfp_bexp:25 : lfp_bexp
 syntax "(" lfp_bexp ")" : lfp_bexp
 syntax "[" term "]" : lfp_bexp
+syntax ident : lfp_bexp
 syntax "[BExp|" lfp_bexp "]" : term
 
 
@@ -107,10 +108,11 @@ macro_rules
   | `([BExp| ~ $x:lfp_bexp]) => `(BExp.Not [BExp|$x])
   | `([BExp| ($x:lfp_bexp)]) => `([BExp| $x])
   | `([BExp| [$x:term] ]) => `((($x): BExp))
+  | `([BExp| $x:ident ]) => `((($x): BExp))
 
 
 namespace Playground
-def B1 := [BExp| 4 <= 2 && ~3 == 4 + 3 && ~[true]]
+def B1 := [BExp| 4 <= 2 && ~3 == 4 + 3 && ~true]
 def B2 := BExp.And (
     BExp.And (BExp.Le 4 2) (BExp.Not (BExp.Eq 3 ((4: AExp) + 3)))
   ) (BExp.Not .True)
@@ -180,7 +182,7 @@ example: state![X => 5; Y => 4].aeval <{A| Z + (X * Y)}> = 20 := by
   eq_refl
 
 
-example: state![X => 5].beval <{B| [true] && ~(X <= 4) }> = true := by
+example: state![X => 5].beval <{B| true && ~(X <= 4) }> = true := by
   eq_refl
 
 end Playground
@@ -229,7 +231,7 @@ end Playground
 
 
 def Imp.loop := <{
-  while [true] do
+  while true do
     skip
   end
 }>
