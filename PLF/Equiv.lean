@@ -345,3 +345,65 @@ theorem Imp.assign_aequiv {x: String} {a}:
         unfold State.update
         rewrite [E]
         apply BigStep.BSkip
+
+
+instance: Reflexive AExp.equiv where
+  refl {a} := by
+    intros st
+    eq_refl
+
+instance: Symmetric AExp.equiv where
+  symm {a b} := by
+    intros H st
+    specialize (H st)
+    symm
+    exact H
+
+instance: Transitive AExp.equiv where
+  trans {a b c} := by
+    intros Hab Hbc
+    intros st
+    specialize (Hab st)
+    specialize (Hbc st)
+    apply Hab.trans Hbc
+
+
+instance: Reflexive BExp.equiv where
+  refl {a} := by
+    intros st
+    eq_refl
+
+instance: Symmetric BExp.equiv where
+  symm {a b} := by
+    intros H st
+    specialize (H st)
+    symm
+    exact H
+
+instance: Transitive BExp.equiv where
+  trans {a b c} := by
+    intros Hab Hbc
+    intros st
+    specialize (Hab st)
+    specialize (Hbc st)
+    apply Hab.trans Hbc
+
+
+instance: Reflexive Imp.equiv where
+  refl {a} := by
+    intros st1 st2
+    apply Iff.refl
+
+instance: Symmetric Imp.equiv where
+  symm {a b} := by
+    intros H st1 st2
+    specialize (H st1 st2)
+    apply H.symm
+
+instance: Transitive Imp.equiv where
+  trans {a b c} := by
+    intros Hab Hbc
+    intros st1 st2
+    specialize (Hab st1 st2)
+    specialize (Hbc st1 st2)
+    apply Hab.trans Hbc
