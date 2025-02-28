@@ -195,6 +195,7 @@ inductive Imp : Type where
 syntax:100 "skip": lfp_imp
 syntax:100 ident ":=" lfp_aexp:15 : lfp_imp
 syntax:100 "[" term "]" ":=" lfp_aexp:15 : lfp_imp
+syntax:100 "(" lfp_imp ")" : lfp_imp
 syntax:10 lfp_imp ";" lfp_imp : lfp_imp
 syntax:11 "if" lfp_bexp:5 "then" lfp_imp:5 "else" lfp_imp:5 "end": lfp_imp
 syntax:11 "while" lfp_bexp:5 "do" lfp_imp:5 "end": lfp_imp
@@ -205,6 +206,7 @@ macro_rules
   | `(<{ skip }>) => `(Imp.Skip)
   | `(<{ $v:ident := $y:lfp_aexp }>) => `(Imp.Asgn $(Lean.quote (toString v.getId)) [AExp|$y])
   | `(<{ [$t] := $y:lfp_aexp }>) => `(Imp.Asgn $t [AExp|$y])
+  | `(<{ ( $x:lfp_imp ) }>) => `(<{ $x }>)
   | `(<{ $c1 ; $c2 }>) => `(Imp.Seq <{$c1}> <{$c2}>)
   | `(<{ if $b then $t else $f end }>) => `(Imp.If [BExp|$b] <{$t}> <{$f}>)
   | `(<{ while $b do $t end }>) => `(Imp.While [BExp|$b] <{$t}>)
