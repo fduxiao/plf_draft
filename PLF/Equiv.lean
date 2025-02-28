@@ -23,7 +23,7 @@ example: <{B| X - X == 0 }>.equiv <{B| true }> := by
 
 
 def Imp.equiv: Relation Imp := fun (c1 c2: Imp) =>
-  forall (st1 st2 : State), (st1 =[ c1 ]=> st2) <-> (st1 =[ c2 ]=> st2)
+  forall {st1 st2 : State}, (st1 =[ c1 ]=> st2) <-> (st1 =[ c2 ]=> st2)
 
 
 def Imp.refines: Relation Imp := fun (c1 c2 : Imp) =>
@@ -397,13 +397,163 @@ instance: Reflexive Imp.equiv where
 instance: Symmetric Imp.equiv where
   symm {a b} := by
     intros H st1 st2
-    specialize (H st1 st2)
     apply H.symm
 
 instance: Transitive Imp.equiv where
   trans {a b c} := by
     intros Hab Hbc
     intros st1 st2
-    specialize (Hab st1 st2)
-    specialize (Hbc st1 st2)
     apply Hab.trans Hbc
+
+
+theorem Imp.Asgn.congruence {x} {a1 a2: AExp}:
+  a1.equiv a2 -> <{[x] := [a1]}>.equiv <{[x] := [a2]}> := by
+    intros Hequiv
+    intros st1 st2
+    specialize Hequiv st1
+    apply Iff.intro
+    . intros H
+      cases H with
+      | BAsgn H =>
+        rewrite [<-H]
+        rewrite [Hequiv]
+        apply BigStep.BAsgn
+        eq_refl
+    . intros H
+      cases H with
+      | BAsgn H =>
+        rewrite [<-H]
+        rewrite [<-Hequiv]
+        apply BigStep.BAsgn
+        eq_refl
+
+
+theorem Imp.While.congruence {b1 b2: BExp} {c1 c2: Imp}:
+  b1.equiv b2 -> c1.equiv c2 ->
+  <{ while b1 do c1 end }>.equiv <{ while b2 do c2 end }> := by
+    have A {b1 b2 : BExp} {c1 c2 : Imp} {st1 st2}:
+      b1.equiv b2 -> c1.equiv c2 ->
+      st1 =[ while b1 do c1 end ]=> st2 ->
+      st1 =[ while b2 do c2 end ]=> st2 := by
+        intros Hb Hc
+        generalize E: <{ while b1 do c1 end }> = t
+        intros H
+        induction H with
+        | @BWhileFalse b c st HF =>
+          cases E
+          rewrite [Hb] at HF
+          apply BigStep.BWhileFalse HF
+        | @BWhileTrue b c st1 st2 st3 HT H12 H23 IH12 IH23 =>
+          cases E
+          rewrite [Hb] at HT
+          apply BigStep.BWhileTrue HT
+          . apply Hc.mp
+            apply H12
+          . apply IH23
+            eq_refl
+        | _ => cases E
+    intros Hb Hc
+    intros st1 st2
+    apply Iff.intro
+    . apply A Hb Hc
+    . apply A
+      . apply BExp.equiv.symm
+        apply Hb
+      . apply Imp.equiv.symm
+        apply Hc
+
+
+theorem Imp.Seq.congruence {c1 c2 d1 d2: Imp}:
+  c1.equiv c2 -> d1.equiv d2 ->
+  <{ c1; d1 }>.equiv <{ c2; d2 }> := by
+    intros Hc Hd
+    intros st1 st2
+    apply Iff.intro
+    . intros H
+      cases H with
+      | @BSeq _ _ _ t _ H1 H2 =>
+        apply BigStep.BSeq
+        . apply Hc.mp
+          apply H1
+        . apply Hd.mp
+          apply H2
+    . intros H
+      cases H with
+      | @BSeq _ _ _ t _ H1 H2 =>
+        apply BigStep.BSeq
+        . apply Hc.mpr
+          apply H1
+        . apply Hd.mpr
+          apply H2
+
+
+theorem Imp.If.congruence {b1 b2: BExp} {c1 c2 d1 d2: Imp}:
+  b1.equiv b2 -> c1.equiv c2 -> d1.equiv d2 ->
+    <{ if b1 then c1 else d1 end }>.equiv
+    <{ if b2 then c2 else d2 end }>
+  := by
+    intros Hb Hc Hd
+    intros st1 st2
+    generalize E: st1.beval b1 = t
+    cases t with
+    | true =>
+      apply Iff.intro
+      . intros H
+        cases H with
+        | BIfTrue _ H =>
+          rewrite [Hb] at E
+          apply BigStep.BIfTrue E
+          apply Hc.mp
+          exact H
+        | BIfFalse HF =>
+          rewrite [E] at HF
+          contradiction
+      . intros H
+        cases H with
+        | BIfTrue _ H =>
+          apply BigStep.BIfTrue E
+          rewrite [Hc]
+          exact H
+        | BIfFalse HF =>
+          rewrite [Hb] at E
+          rewrite [E] at HF
+          contradiction
+    | false =>
+      apply Iff.intro
+      . intros H
+        cases H with
+        | BIfTrue HT =>
+          rewrite [E] at HT
+          contradiction
+        | BIfFalse _ H =>
+          rewrite [Hb] at E
+          apply BigStep.BIfFalse E
+          apply Hd.mp
+          exact H
+      . intros H
+        cases H with
+        | BIfTrue HT =>
+          rewrite [Hb] at E
+          rewrite [E] at HT
+          contradiction
+        | BIfFalse _ H =>
+          apply BigStep.BIfFalse E
+          apply Hd.mpr
+          exact H
+
+example:
+    <{ X := 0;
+       if X == 0 then Y := 0
+       else Y := 42 end }>.equiv
+    <{ X := 0;
+       if X == 0 then Y := X - X
+       else Y := 42 end }>
+    := by
+      apply Imp.Seq.congruence
+      . apply @Imp.equiv.refl
+      . apply Imp.If.congruence
+        . apply BExp.equiv.refl
+        . apply Imp.Asgn.congruence
+          intros st
+          simp
+        . apply @Imp.equiv.refl
