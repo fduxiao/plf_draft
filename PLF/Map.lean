@@ -52,52 +52,58 @@ theorem TotalMap.update_neq {A: Type} {m: TotalMap A} {x1 x2 v}:
 
 
 theorem TotalMap.update_shadow {A: Type} {m : TotalMap A} {x v1 v2}:
-  map![x => v2 ; x => v1 ; m] = map![x => v2 ; m] := by
-    apply funext
-    intros y
-    cases (y.decEq x) with
-    | isTrue E =>
-      simp [update, E]
-    | isFalse NE =>
-      simp [update, NE]
+  map![x => v2 ; x => v1 ; m] = map![x => v2 ; m]
+:= by
+  apply funext
+  intros y
+  cases (y.decEq x) with
+  | isTrue E =>
+    simp [update, E]
+  | isFalse NE =>
+    simp [update, NE]
 
 
 theorem TotalMap.update_same {A : Type} {m : TotalMap A} {x}:
-  map![x => m x ; m] = m := by
-    apply funext
-    intros y
-    cases (y.decEq x) with
-    | isTrue E =>
-      simp [update, E]
-    | isFalse NE =>
-      simp [update, NE]
+  map![x => m x ; m] = m
+:= by
+  apply funext
+  intros y
+  cases (y.decEq x) with
+  | isTrue E =>
+    simp [update, E]
+  | isFalse NE =>
+    simp [update, NE]
 
 
 theorem TotalMap.update_permute {A: Type} {m : TotalMap A} {x1 x2 v1 v2}:
   x1 ≠ x2 ->
-  map![x1 => v1 ; x2 => v2 ; m] =  map![x1 => v1 ; x2 => v2 ; m] := by
-    intros H
-    apply funext
-    intros y
-    simp [update]
+  map![x1 => v1 ; x2 => v2 ; m] =  map![x1 => v1 ; x2 => v2 ; m]
+:= by
+  intros H
+  apply funext
+  intros y
+  simp [update]
 
 
 theorem PartialMap.apply_empty {A: Type} {x: String}:
-  @PartialMap.empty A x = .none := by
-    apply TotalMap.apply_empty
+  @PartialMap.empty A x = .none
+:= by
+  apply TotalMap.apply_empty
 
 
 theorem PartialMap.update_eq {A: Type} {m : PartialMap A} {x} {v: A}:
-  map![x => v ; m] x = .some v := by
-    apply TotalMap.update_eq
+  map![x => v ; m] x = .some v
+:= by
+  apply TotalMap.update_eq
 
 
 theorem PartialMap.update_same {A : Type} {m : PartialMap A} {x} {v: A}:
   m x = .some v ->
-  map![x => v ; m] = m := by
-    intros H
-    rewrite [<-H]
-    apply TotalMap.update_same
+  map![x => v ; m] = m
+:= by
+  intros H
+  rewrite [<-H]
+  apply TotalMap.update_same
 
 
 def PartialMap.inclusion {A: Type} (m m': PartialMap A) :=
@@ -107,12 +113,13 @@ def PartialMap.inclusion {A: Type} (m m': PartialMap A) :=
 theorem inclusion_update {A: Type} {m m' : PartialMap A}
   {x : String} {vx : A}:
   m.inclusion m' ->
-  PartialMap.inclusion (map![x => vx ; m]) map![x => vx ; m'] := by
-    intros H
-    intros y vy
-    cases y.decEq x with
-    | isTrue Hxy =>
-      simp [TotalMap.update, Hxy]
-    | isFalse Hxy =>
-      simp [TotalMap.update, Hxy]
-      apply H
+  PartialMap.inclusion (map![x => vx ; m]) map![x => vx ; m']
+:= by
+  intros H
+  intros y vy
+  cases y.decEq x with
+  | isTrue Hxy =>
+    simp [TotalMap.update, Hxy]
+  | isFalse Hxy =>
+    simp [TotalMap.update, Hxy]
+    apply H

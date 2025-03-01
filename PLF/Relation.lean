@@ -35,8 +35,9 @@ class SubRel {A} (P: Relation A) (Q: Relation A): Prop where
 notation: 60 P " sub_rel " Q => SubRel P Q
 
 def Relation.super {A: Type} {P: Relation A} {Super: Relation A}
-  [inst: P sub_rel Super]: forall {a b: A}, P a b -> Super a b :=
-    inst.inclusion
+  [inst: P sub_rel Super]: forall {a b: A}, P a b -> Super a b
+:=
+  inst.inclusion
 
 /-!
 `SubRel` is it self a poset on all relations
@@ -62,14 +63,18 @@ instance: forall {A: Type}, Transitive (SubRel (A := A)) where
 
 
 theorem sub_rel_equiv: forall {A: Type} {P Q: Relation A},
-  (P sub_rel Q) -> (Q sub_rel P) -> forall {a b: A}, P a b <-> Q a b := by
+  (P sub_rel Q) -> (Q sub_rel P) -> forall {a b: A}, P a b <-> Q a b
+:= by
   intros A P Q s1 s2
   intros a b
   constructor
   . apply s1.inclusion
   . apply s2.inclusion
 
-theorem rel_eq: forall {A: Type} {P Q: Relation A}, (forall x y: A, P x y <-> Q x y) -> P = Q := by
+theorem rel_eq: forall {A: Type} {P Q: Relation A},
+  (forall x y: A, P x y <-> Q x y) ->
+  P = Q
+:= by
   intros A P Q H
   apply funext
   intros x
@@ -108,11 +113,12 @@ instance {A: Type} {P C: Relation A} {Pred: RelationPred A} [inst: Closure Pred 
   P sub_rel C := inst.sub
 
 instance cl_cl_sub {A: Type} {Pred: RelationPred A} {P: Relation A} {C1 C2: Relation A}
-  [inst1: Closure Pred P C1] [inst2: Closure Pred P C2]: C1 sub_rel C2 where
-    inclusion := by
-      intros a b
-      let sub := @inst1.least C2 inst2.pred inst2.sub
-      apply sub.inclusion
+  [inst1: Closure Pred P C1] [inst2: Closure Pred P C2]: C1 sub_rel C2
+where
+  inclusion := by
+    intros a b
+    let sub := @inst1.least C2 inst2.pred inst2.sub
+    apply sub.inclusion
 
 
 class ClosureOp {A: Type} (Pred: outParam (RelationPred A)) (Cl: outParam (RelationOp A)) where
@@ -122,26 +128,33 @@ class ClosureOp {A: Type} (Pred: outParam (RelationPred A)) (Cl: outParam (Relat
   least {P Q: Relation A} := (close P).least (P := P) (Q := Q)
 
 
-def RelationOp.close {A: Type} (Cl: RelationOp A) (P: Relation A) {Pred: RelationPred A}
-  [inst: ClosureOp Pred Cl] := inst.close P
+def RelationOp.close {A: Type}
+  (Cl: RelationOp A) (P: Relation A) {Pred: RelationPred A}
+  [inst: ClosureOp Pred Cl]
+:= inst.close P
 
 
 instance {A: Type} {Pred: RelationPred A} (Cl: RelationOp A) [inst: ClosureOp Pred Cl]
-  (P: Relation A): Closure Pred P (Cl P) := inst.close P
+  (P: Relation A): Closure Pred P (Cl P)
+:= inst.close P
 
 
-instance {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl] {P: Relation A}:
-  P sub_rel (Cl P) := (inst.close P).sub
+instance {A: Type} {Pred: RelationPred A} {Cl: RelationOp A}
+  [inst: ClosureOp Pred Cl] {P: Relation A}: P sub_rel (Cl P)
+:= (inst.close P).sub
 
 instance cl_op_cl_op_sub {A: Type} {Pred: RelationPred A} {C1 C2: RelationOp A}
-  [inst1: ClosureOp Pred C1] [inst2: ClosureOp Pred C2] {P: Relation A}: C1 P sub_rel C2 P where
-    inclusion := by
-      intros a b
-      let sub := @inst1.least P (C2 P) inst2.pred inst2.sub
-      apply sub.inclusion
+  [inst1: ClosureOp Pred C1] [inst2: ClosureOp Pred C2]
+  {P: Relation A}: C1 P sub_rel C2 P
+where
+  inclusion := by
+    intros a b
+    let sub := @inst1.least P (C2 P) inst2.pred inst2.sub
+    apply sub.inclusion
 
 instance cl_mono {A: Type} {Pred: RelationPred A} {Cl: RelationOp A} [inst: ClosureOp Pred Cl]
-  {P Q: Relation A} [r1: P sub_rel Q]: Cl P sub_rel Cl Q where
+  {P Q: Relation A} [r1: P sub_rel Q]: Cl P sub_rel Cl Q
+where
   inclusion := by
     have r2: Q sub_rel Cl Q := inst.sub
     have r3: P sub_rel Cl Q := Relation.trans r1 r2

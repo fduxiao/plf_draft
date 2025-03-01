@@ -298,89 +298,91 @@ example: State.empty =[
 theorem Imp.BigStep.deterministic {c} {st1 st2 st3: State}:
   st1 =[ c ]=> st2 ->
   st1 =[ c ]=> st3 ->
-  st2 = st3 := by
-    intros H12
-    revert st3
-    induction H12 with
-    | BSkip =>
-      intros st3 H13
-      cases H13
+  st2 = st3
+:= by
+  intros H12
+  revert st3
+  induction H12 with
+  | BSkip =>
+    intros st3 H13
+    cases H13
+    eq_refl
+  | BAsgn E1 =>
+    intros st3 H13
+    cases H13 with
+    | BAsgn E2 =>
+      rewrite [E1] at E2
+      subst E2
       eq_refl
-    | BAsgn E1 =>
-      intros st3 H13
-      cases H13 with
-      | BAsgn E2 =>
-        rewrite [E1] at E2
-        subst E2
-        eq_refl
-    | @BSeq c1 c2 st1 s st2 E1 E2 IH1 IH2 =>
-      intros st3 H13
-      cases H13 with
-      | @BSeq _ _ _ t _ H1t Ht3 =>
-        specialize IH1 H1t
-        apply IH2
-        rewrite [IH1]
-        apply Ht3
-    | @BIfTrue b c1 c2 st1 st2 HT H12 IH =>
-      intros st3 H13
-      cases H13 with
-      | BIfTrue _ H13 =>
-        apply IH
-        apply H13
-      | BIfFalse E _ =>
-        rewrite [E] at HT
-        contradiction
-    | @BIfFalse b c1 c2 st1 st2 HF H12 IH =>
-      intros st3 H13
-      cases H13 with
-      | BIfTrue E _ =>
-        rewrite [E] at HF
-        contradiction
-      | BIfFalse _ H13 =>
-        apply IH
-        apply H13
-    | @BWhileFalse b c st HF=>
-      intros st3 H13
-      cases H13 with
-      | BWhileFalse =>
-        eq_refl
-      | BWhileTrue HT =>
-        rewrite [HF] at HT
-        contradiction
-    | @BWhileTrue b c st1 s st2 HT H12 H23 IH1 IH2 =>
-      intros st3 H13
-      cases H13 with
-      | BWhileFalse HF =>
-        rewrite [HF] at HT
-        contradiction
-      | @BWhileTrue _ _ _ t _ _ H1t Ht3  =>
-        specialize IH1 H1t
-        apply IH2
-        rewrite [IH1]
-        apply Ht3
+  | @BSeq c1 c2 st1 s st2 E1 E2 IH1 IH2 =>
+    intros st3 H13
+    cases H13 with
+    | @BSeq _ _ _ t _ H1t Ht3 =>
+      specialize IH1 H1t
+      apply IH2
+      rewrite [IH1]
+      apply Ht3
+  | @BIfTrue b c1 c2 st1 st2 HT H12 IH =>
+    intros st3 H13
+    cases H13 with
+    | BIfTrue _ H13 =>
+      apply IH
+      apply H13
+    | BIfFalse E _ =>
+      rewrite [E] at HT
+      contradiction
+  | @BIfFalse b c1 c2 st1 st2 HF H12 IH =>
+    intros st3 H13
+    cases H13 with
+    | BIfTrue E _ =>
+      rewrite [E] at HF
+      contradiction
+    | BIfFalse _ H13 =>
+      apply IH
+      apply H13
+  | @BWhileFalse b c st HF=>
+    intros st3 H13
+    cases H13 with
+    | BWhileFalse =>
+      eq_refl
+    | BWhileTrue HT =>
+      rewrite [HF] at HT
+      contradiction
+  | @BWhileTrue b c st1 s st2 HT H12 H23 IH1 IH2 =>
+    intros st3 H13
+    cases H13 with
+    | BWhileFalse HF =>
+      rewrite [HF] at HT
+      contradiction
+    | @BWhileTrue _ _ _ t _ _ H1t Ht3  =>
+      specialize IH1 H1t
+      apply IH2
+      rewrite [IH1]
+      apply Ht3
 
 
 theorem Imp.loop.never_stops {st1 st2: State}:
-  Not (st1 =[ loop ]=> st2) := by
-    generalize E: loop = t
-    intros H
-    induction H with
-    | BSkip =>
-      contradiction
-    | BAsgn =>
-      contradiction
-    | BSeq =>
-      contradiction
-    | BIfTrue =>
-      contradiction
-    | BIfFalse =>
-      contradiction
-    | @BWhileFalse b c st HF =>
-      cases E
-      contradiction
-    | @BWhileTrue b c st1 st2 st3 HT H12 H23 IH1 IH2 =>
-      apply IH2
-      apply E
+  Not (st1 =[ loop ]=> st2)
+:= by
+  generalize E: loop = t
+  intros H
+  induction H with
+  | BSkip =>
+    contradiction
+  | BAsgn =>
+    contradiction
+  | BSeq =>
+    contradiction
+  | BIfTrue =>
+    contradiction
+  | BIfFalse =>
+    contradiction
+  | @BWhileFalse b c st HF =>
+    cases E
+    contradiction
+  | @BWhileTrue b c st1 st2 st3 HT H12 H23 IH1 IH2 =>
+    apply IH2
+    apply E
 
 
 section StackCalculator
@@ -414,13 +416,16 @@ def State.s_execute (st: State) (stack: List Nat) (prog: List SInstr)
 
 
 example: State.empty.s_execute []
-  [.SPush 5, .SPush 3, .SPush 1, .SMinus] = [2, 5] := by
-    eq_refl
+  [.SPush 5, .SPush 3, .SPush 1, .SMinus] = [2, 5]
+:= by
+  eq_refl
 
-example: state!["X" => 3].s_execute [3, 4]
-       [.SPush 4, .SLoad "X", .SMult, .SPlus]
-   = [15, 4] := by
-    eq_refl
+example: state!["X" => 3].s_execute
+  [3, 4]
+  [.SPush 4, .SLoad "X", .SMult, .SPlus]
+  = [15, 4]
+:= by
+  eq_refl
 
 @[simp]
 def AExp.s_compile (e : AExp) : List SInstr :=
@@ -433,8 +438,9 @@ def AExp.s_compile (e : AExp) : List SInstr :=
 
 
 example: <{A| X - (2 * Y) }>.s_compile
-  = [.SLoad "X", .SPush 2, .SLoad "Y", .SMult, .SMinus] := by
-    eq_refl
+  = [.SLoad "X", .SPush 2, .SLoad "Y", .SMult, .SMinus]
+:= by
+  eq_refl
 
 
 theorem List.cases2 {A} {motive: List A -> Prop}:
@@ -456,40 +462,42 @@ theorem List.cases2 {A} {motive: List A -> Prop}:
 
 theorem AExp.execute_app {st: State} {p1 p2 stack}:
   st.s_execute stack (p1 ++ p2)
-  = st.s_execute (st.s_execute stack p1) p2 := by
-    revert stack
-    induction p1 with
-    | nil =>
+  = st.s_execute (st.s_execute stack p1) p2
+:= by
+  revert stack
+  induction p1 with
+  | nil =>
+    simp
+  | cons x xs IHxs =>
+    intros stack
+    cases x with
+    | SPush n | SLoad =>
       simp
-    | cons x xs IHxs =>
-      intros stack
-      cases x with
-      | SPush n | SLoad =>
-        simp
-        apply IHxs
-      | SPlus | SMinus | SMult =>
-        apply stack.cases2 <;> simp <;> intros <;> apply IHxs
+      apply IHxs
+    | SPlus | SMinus | SMult =>
+      apply stack.cases2 <;> simp <;> intros <;> apply IHxs
 
 
 theorem AExp.s_compile.correct_aux {st: State} {e stack}:
-  st.s_execute stack e.s_compile = st.aeval e :: stack := by
-    revert stack
-    induction e with
-    | Num n | Var s =>
-      simp
-    | Plus n1 n2 IH1 IH2 | Minus n1 n2 IH1 IH2 | Mult n1 n2 IH1 IH2 =>
-      intros stack
-      simp
-      rewrite [AExp.execute_app]
-      rewrite [AExp.execute_app]
-      rewrite [IH1]
-      rewrite [IH2]
-      simp
+  st.s_execute stack e.s_compile = st.aeval e :: stack
+:= by
+  revert stack
+  induction e with
+  | Num n | Var s =>
+    simp
+  | Plus n1 n2 IH1 IH2 | Minus n1 n2 IH1 IH2 | Mult n1 n2 IH1 IH2 =>
+    intros stack
+    simp
+    rewrite [AExp.execute_app]
+    rewrite [AExp.execute_app]
+    rewrite [IH1]
+    rewrite [IH2]
+    simp
 
 
 theorem AExp.s_compile.correct {st: State} e:
   st.s_execute [] e.s_compile = [ st.aeval e ]
-  := AExp.s_compile.correct_aux (stack := [])
+:= AExp.s_compile.correct_aux (stack := [])
 
 
 end StackCalculator
