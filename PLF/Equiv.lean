@@ -406,26 +406,35 @@ instance: Transitive Imp.equiv where
     apply Hab.trans Hbc
 
 
-theorem Imp.Asgn.congruence {x} {a1 a2: AExp}:
-  a1.equiv a2 -> <{[x] := [a1]}>.equiv <{[x] := [a2]}> := by
-    intros Hequiv
-    intros st1 st2
-    specialize Hequiv st1
+theorem Imp.Asgn.congruence_st {x} {a1 a2: AExp} {st1: State}:
+  (st1.aeval a1 = st1.aeval a2) -> {st2: State} ->
+  st1 =[ [x] := [a1] ]=> st2 <-> st1 =[ [x] := [a2] ]=> st2 := by
+    intros E
+    intros st2
     apply Iff.intro
     . intros H
       cases H with
       | BAsgn H =>
         rewrite [<-H]
-        rewrite [Hequiv]
+        rewrite [E]
         apply BigStep.BAsgn
         eq_refl
     . intros H
       cases H with
       | BAsgn H =>
         rewrite [<-H]
-        rewrite [<-Hequiv]
+        rewrite [<-E]
         apply BigStep.BAsgn
         eq_refl
+
+
+theorem Imp.Asgn.congruence {x} {a1 a2: AExp}:
+  a1.equiv a2 -> <{[x] := [a1]}>.equiv <{[x] := [a2]}> := by
+    intros E
+    intros st1 st2
+    specialize E st1
+    apply Imp.Asgn.congruence_st
+    apply E
 
 
 theorem Imp.While.congruence {b1 b2: BExp} {c1 c2: Imp}:
