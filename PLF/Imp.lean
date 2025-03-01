@@ -124,8 +124,8 @@ end Playground
 
 
 abbrev State := TotalMap Nat
-def State.empty: State := TotalMap.empty 0
-def State.update: State -> String -> Nat -> State := TotalMap.update
+@[simp] def State.empty: State := TotalMap.empty 0
+@[simp] def State.update: State -> String -> Nat -> State := TotalMap.update
 
 
 @[simp]

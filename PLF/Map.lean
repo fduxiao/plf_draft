@@ -1,14 +1,16 @@
 def TotalMap (A: Type) := String -> A
 abbrev PartialMap (A: Type) := TotalMap (Option A)
 
+@[simp]
 def TotalMap.empty {A: Type} (v: A): TotalMap A := fun _ => v
+@[simp]
 def PartialMap.empty {A: Type}: PartialMap A := TotalMap.empty .none
 
-
+@[simp]
 def TotalMap.update {A: Type} (m: TotalMap A) (x: String) (v: A): TotalMap A
   := fun x' => if x' == x then v else m x'
 
-
+@[simp]
 def Partial.update {A: Type} (m: PartialMap A) (x: String) (v: A): PartialMap A
   := TotalMap.update m x (Option.some v)
 
