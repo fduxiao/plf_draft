@@ -850,3 +850,229 @@ instance: Imp.fold_constants.Sound Imp.equiv where
         . rewrite [<-E]
           apply S
         . apply IHc
+
+
+@[simp]
+def AExp.subst (a: AExp) (x: String) (u: AExp): AExp :=
+  match a with
+  | .Num n => .Num n
+  | .Var y =>
+    if y == x then u else .Var y
+  | .Plus a1 a2 =>
+    (a1.subst x u) + (a2.subst x u)
+  | .Minus a1 a2 =>
+    (a1.subst x u) - (a2.subst x u)
+  | .Mult a1 a2 =>
+    (a1.subst x u) * (a2.subst x u)
+
+
+example:
+  <{A| Y + X }>.subst "X" <{A| 42 + 53}>
+  = <{A| Y + (42 + 53) }> := by
+    eq_refl
+
+
+namespace UnsuitableSubst
+
+def AExp.subst.equiv_property : Prop := forall x1 x2 a1 a2,
+  <{ [x1] := [a1]; [x2] := [a2] }>.equiv
+    <{ [x1] := [a1]; [x2] := [a2.subst x1 a1] }>
+
+theorem AExp.subst.inequiv: Not AExp.subst.equiv_property := by
+  unfold equiv_property
+  intros H
+  let X := "X"
+  let Y := "Y"
+  let a1 := <{A| [X] + 1 }>
+  let a2 := <{A| [X] }>
+  let a2' := a2.subst X a1
+  let st1 := State.empty
+  let st2 := state!["X" => 1]
+  let st3 := state!["Y" => 2; "X" => 1]
+
+  have Hst12: (st1.update X (st1.aeval a1)) = st2 := by
+    eq_refl
+
+  have Hst23: st3 = (st2.update Y (st2.aeval a2')) := by
+    eq_refl
+
+  specialize (@H X Y a1 a2 st1 st3)
+  have T: <{ [X] := [a1]; [Y] := [a2.subst X a1] }>.BigStep st1 st3
+  := by
+    apply Imp.BigStep.BSeq
+    . apply Imp.BigStep.BAsgn (n := 1)
+      unfold a1
+      unfold st1
+      eq_refl
+    . apply Imp.BigStep.BAsgn
+      eq_refl
+
+  have K {st1 st2: State}:
+    (Imp.Asgn Y a2).BigStep st1 st2 ->
+    st2.aeval Y = st1.aeval a2
+  := by
+    intros H
+    cases H with
+    | @BAsgn _ _ n x E =>
+      simp
+      symm
+      exact E
+
+  let H := H.mpr T
+  cases H with
+  | @BSeq _ _ _ t1 _ H1 H2 =>
+    cases H1 with
+    | @BAsgn _ _ n1 x E1 =>
+      rewrite [<-E1] at H2
+      rewrite [Hst12] at H2
+      specialize (K H2)
+      unfold Y st2 st3 a2 at K
+      simp at K
+      have E: 1 = if X = "X" then 1 else 0 := by
+        eq_refl
+      rewrite [<-E] at K
+      contradiction
+
+end UnsuitableSubst
+
+
+inductive AExp.not_contain_var (x: String): AExp -> Prop where
+  | NNum {n: Nat} : (AExp.Num n).not_contain_var x
+  | NVar {y}: x ≠ y -> (AExp.Var y).not_contain_var x
+  | NPlus {a1 a2: AExp}:
+    a1.not_contain_var x ->
+    a2.not_contain_var x ->
+    <{A| [a1] + [a2] }>.not_contain_var x
+
+  | NMinus {a1 a2: AExp}:
+    a1.not_contain_var x ->
+    a2.not_contain_var x ->
+    <{A| [a1] - [a2] }>.not_contain_var x
+  | NMult {a1 a2: AExp}:
+    a1.not_contain_var x ->
+    a2.not_contain_var x ->
+    <{A| [a1] * [a2] }>.not_contain_var x
+
+
+theorem State.aeval.weakening {a: AExp} {x}:
+  a.not_contain_var x ->
+  forall (st: State) (ni), state![x => ni ; st].aeval a = st.aeval a
+:= by
+  intros H
+  intros st ni
+  induction a with
+  | Num n =>
+    eq_refl
+  | Var s =>
+    cases H
+    unfold aeval
+    apply TotalMap.update_neq
+    assumption
+  | Plus n1 n2 IHn1 IHn2 | Minus n1 n2 IHn1 IHn2 | Mult n1 n2 IHn1 IHn2 =>
+    cases H
+    unfold aeval
+    rewrite [IHn1] <;> try assumption
+    rewrite [IHn2] <;> try assumption
+    eq_refl
+
+
+theorem State.aeval.subst_eq {a u: AExp} {x}:
+  u.not_contain_var x ->
+  forall (st: State),
+    st.aeval u = st.aeval x ->
+    st.aeval a = st.aeval (a.subst x u)
+:= by
+  induction a with
+  | Num n =>
+    simp
+  | Var y =>
+    simp
+    intros NC st H
+    cases String.decEq y x with
+    | isTrue K =>
+      simp [K]
+      symm
+      apply H
+    | isFalse K =>
+      simp [K]
+  | Plus n1 n2 IH1 IH2 | Minus n1 n2 IH1 IH2 | Mult n1 n2 IH1 IH2 =>
+    intros NC st H
+    specialize (IH1 NC st H)
+    specialize (IH2 NC st H)
+    simp
+    rewrite [IH1, IH2]
+    eq_refl
+
+
+theorem AExp.subst.equiv_property {x1 x2} {a1 a2: AExp}:
+  a1.not_contain_var x1 ->
+  <{ [x1] := [a1]; [x2] := [a2] }>.equiv
+    <{ [x1] := [a1]; [x2] := [a2.subst x1 a1] }>
+:= by
+  intros NC
+  intros st1 st3
+
+  let st2 := st1.update x1 (st1.aeval a1)
+
+  have H12: st1 =[ [x1] := [a1] ]=> st2 := by
+    apply Imp.BigStep.BAsgn
+    eq_refl
+
+  have Ust2 {t}: st1 =[ [x1] := [a1] ]=> t -> t = st2 := by
+    intros H
+    apply Imp.BigStep.deterministic
+    . apply H
+    . apply H12
+
+  have E: st1.aeval a1 = st2 x1 := by
+    unfold st2
+    simp
+
+  have K: st2.aeval a2 = st2.aeval (a2.subst x1 a1) := by
+    induction a2 with
+    | Num n =>
+      eq_refl
+    | Var y =>
+      simp
+      cases String.decEq y x1 with
+      | isTrue K =>
+        simp [K]
+        rewrite [<-E]
+        unfold st2
+        symm
+        apply State.aeval.weakening NC
+      | isFalse K =>
+        simp [K]
+    | Plus a1 a2 IHa1 IHa2 | Minus a1 a2 IHa1 IHa2 | Mult a1 a2 IHa1 IHa2 =>
+      simp
+      rewrite [IHa1]
+      rewrite [IHa2]
+      eq_refl
+
+  apply Iff.intro <;> (
+    intros H
+    cases H with
+    | @BSeq _ _ _ t _ H1 H2 =>
+      specialize (Ust2 H1)
+      cases H2 with
+      | BAsgn E =>
+        apply Imp.BigStep.BSeq
+        . apply H1
+        . subst Ust2
+          rewrite [<-E]
+          apply Imp.BigStep.BAsgn
+          rewrite [K]
+          eq_refl
+  )
+
+
+theorem Imp.loop.not_equiv_skip:
+  Not (<{ while true do skip end }>.equiv <{ skip }>)
+:= by
+  simp
+  intros H
+  specialize (@H State.empty State.empty)
+  apply Imp.while_true_nonterm
+  . apply BExp.equiv.refl
+  . apply H.mpr
+    apply BigStep.BSkip
