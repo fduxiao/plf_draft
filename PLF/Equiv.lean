@@ -1080,7 +1080,6 @@ theorem AExp.subst.equiv_property {x1 x2} {a1 a2: AExp}:
 theorem Imp.loop.not_equiv_skip:
   Not (<{ while true do skip end }>.equiv <{ skip }>)
 := by
-  simp
   intros H
   specialize (@H State.empty State.empty)
   apply Imp.while_true_nonterm

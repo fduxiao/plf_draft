@@ -90,7 +90,12 @@ instance: Coe Bool BExp where
   | false => .False
 
 
+declare_syntax_cat bool (behavior := symbol)
+syntax "true": bool
+syntax "false": bool
+
 declare_syntax_cat lfp_bexp
+syntax bool: lfp_bexp
 syntax:30 lfp_aexp "==" lfp_aexp : lfp_bexp
 syntax:30 lfp_aexp "<=" lfp_aexp : lfp_bexp
 syntax:20 lfp_bexp:20 "&&" lfp_bexp:21 : lfp_bexp
@@ -102,6 +107,8 @@ syntax "[BExp|" lfp_bexp "]" : term
 
 
 macro_rules
+  | `([BExp| true ]) => `(BExp.True)
+  | `([BExp| false ]) => `(BExp.False)
   | `([BExp| $x:lfp_aexp == $y:lfp_aexp]) => `(BExp.Eq [AExp|$x] [AExp|$y])
   | `([BExp| $x:lfp_aexp <= $y:lfp_aexp]) => `(BExp.Le [AExp|$x] [AExp|$y])
   | `([BExp| $x:lfp_bexp && $y:lfp_bexp]) => `(BExp.And [BExp|$x] [BExp|$y])
