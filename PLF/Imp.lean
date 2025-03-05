@@ -13,6 +13,9 @@ inductive AExp: Type where
 instance {n: Nat}: OfNat AExp n where
   ofNat := .Num n
 
+instance: Coe Nat AExp where
+  coe := .Num
+
 
 instance: Coe String AExp where
   coe := .Var
