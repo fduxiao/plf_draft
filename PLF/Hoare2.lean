@@ -485,3 +485,52 @@ theorem two_loops a b c:
   verify
 
 end Playground
+
+
+def HoareTriple.is_wp P c Q :=
+  {{P}}< c >{{Q}} /\
+  ∀ P', {{P'}}< c >{{Q}} -> (P' ->> P)
+
+
+example:
+  HoareTriple.is_wp {{ Y <= 4 }} <{X := Y + 1}> {{ X <= 5 }}
+:= by
+  simp
+  apply And.intro
+  . apply HoareTriple.consequence_pre
+    . apply HoareTriple.asgn
+    . simp
+  . intros P' HHoare
+    intros st1 HP'
+    let st2 := st1.update "X" $ st1 "Y" + 1
+    specialize (HHoare st1 st2)
+    simp at HHoare
+    have H: st2 "Y" < 5 := by
+      apply HHoare
+      . apply Imp.BigStep.BAsgn
+        simp
+      . apply HP'
+    unfold st2 at H
+    simp at H
+    omega
+
+
+theorem HoareTriple.asgn_weakest Q X a:
+  HoareTriple.is_wp ({{ Q ![[X] => [a]] }}) <{ [X] := [a] }> Q
+:= by
+  apply And.intro
+  . apply HoareTriple.asgn
+  . intros P' HHoare
+    intros st1 HP'
+    let st2 := st1.update X $ st1.aeval a
+    specialize (HHoare st1 st2)
+    have H: Q st2 := by
+      apply HHoare
+      . unfold st2
+        apply Imp.BigStep.BAsgn
+        simp
+      apply HP'
+    simp
+    unfold st2 at H
+    simp at H
+    exact H
