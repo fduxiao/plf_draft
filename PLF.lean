@@ -6,3 +6,4 @@ import PLF.Relation
 import PLF.Equiv
 import PLF.Hoare
 import PLF.Hoare2
+import PLF.HoareAsLogic
