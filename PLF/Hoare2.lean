@@ -348,4 +348,140 @@ theorem div_mod_outer_triple_valid a b:
         eq_refl
     }
 
+
+def slow_assignment_dec (m : Nat) : Decorated :=
+  <d{
+    {{ X = [m] }}
+      Y := 0
+                    {{ Y = 0 /\ X = [m] }} ->>
+                    {{ X + Y = [m] /\ X = [m]  }} ;
+      while ~X == 0 do
+                    {{ X + Y = [m] /\ ~X = 0  }} ->>
+                    {{ X + Y = [m] ![Y => Y + 1] ![X => X - 1] }}
+        X := X - 1
+                    {{ X + Y = [m] ![Y => Y + 1] }} ;
+        Y := Y + 1
+                    {{ X + Y = [m] }}
+      end
+    {{ X + Y = [m] /\ X = 0 }} ->>
+    {{ Y = [m] }}
+  }>
+
+
+theorem slow_assignment m :
+  (slow_assignment_dec m).outer_triple_valid
+:= by
+  verify
+
+
+def parity (x: Nat): Nat :=
+  match x with
+  | 0 => 0
+  | 1 => 1
+  | .succ (.succ x') => parity x'
+
+
+theorem parity_ge_2 : ∀ x,
+  2 ≤ x ->
+  parity (x - 2) = parity x
+:= by
+  intros x H
+  unfold parity
+  split
+  case h_1 _ H =>
+    have E: x = 2 := by omega
+    subst_eqs
+    eq_refl
+  case h_2 _ H =>
+    have E: x = 3 := by omega
+    subst_eqs
+    eq_refl
+  case h_3 _ n Heq =>
+    have E: x = n + 4 := by omega
+    subst_eqs
+    eq_refl
+
+
+theorem parity_lt_2 : ∀ x,
+  ¬ 2 ≤ x ->
+  parity x = x
+:= by
+  intros x H
+  unfold parity
+  split <;> try eq_refl
+  case _ _ n =>
+    exfalso
+    apply H
+    omega
+
+
+def parity_dec (m: Nat) : Decorated :=
+  <d{
+  {{ X = [m] }} ->>
+  {{ #[parity] X = #[parity m] }}
+    while 2 <= X do
+                  {{ #[parity] X = #[parity m] /\ 2 <= X }} ->>
+                  {{ #[parity] X = #[parity m] ![ X => X - 2] }}
+      X := X - 2
+                  {{ #[parity] X = #[parity m] }}
+    end
+  {{ #[parity] X = #[parity m] /\ X < 2 }} ->>
+  {{ X = #[parity m] }} }>
+
+
+theorem parity_outer_triple_valid : ∀ m,
+  (parity_dec m).outer_triple_valid
+:= by
+  unfold parity_dec
+  intros m
+  verify
+  . intros st E H
+    rewrite [<-E]
+    apply parity_ge_2
+    apply H
+  . intros st E H
+    rewrite [<-E]
+    symm
+    apply parity_lt_2
+    omega
+
+
+def two_loops_dec (a b c : Nat) : Decorated :=
+  <d{
+    {{ True }} ->>
+    {{ (Z = X + [c] /\ Y = 0) ![Z => [c]] ![Y => 0] ![X => 0] }}
+      X := 0
+                   {{ (Z = X + [c] /\ Y = 0) ![Z => [c]] ![Y => 0] }};
+      Y := 0
+                   {{ (Z = X + [c] /\ Y = 0) ![Z => [c]] }};
+      Z := [c]
+                   {{ (Z = X + [c] /\ Y = 0) }};
+      while ~X == [a] do
+                   {{ (Z = X + [c] /\ Y = 0) /\ ~X = [a] }} ->>
+                   {{ (Z = X + [c] /\ Y = 0) ![Z => Z + 1] ![X => X + 1] }}
+        X := X + 1
+                   {{ (Z = X + [c] /\ Y = 0) ![Z => Z + 1] }};
+        Z := Z + 1
+                   {{ (Z = X + [c] /\ Y = 0) }}
+      end
+                   {{ Z = X + [c] /\ Y = 0 /\ X = [a] }} ->>
+                   {{ Z = [a] + Y + [c] }};
+      while ~Y == [b] do
+                   {{ Z = [a] + Y + [c] /\ ~Y = [b] }} ->>
+                   {{ Z = [a] + Y + [c] ![Z => Z + 1] ![Y => Y + 1]}}
+        Y := Y + 1
+                   {{ Z = [a] + Y + [c] ![Z => Z + 1] }};
+        Z := Z + 1
+                   {{ Z = [a] + Y + [c] }}
+      end
+    {{ Z = [a] + Y + [c] /\ Y = [b] }} ->>
+    {{ Z = [a + b + c] }}
+  }>
+
+theorem two_loops a b c:
+  (two_loops_dec a b c).outer_triple_valid
+:= by
+  unfold two_loops_dec
+  verify
+
 end Playground
