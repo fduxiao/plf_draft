@@ -164,6 +164,67 @@ where
 
 end Closure
 
+
+/-!
+Then, the reflexive transitive relation
+-/
+def RTPred {A: Type} (P: Relation A) := Reflexive P ∧ Transitive P
+
+/--
+Reflexive Transitive relation Closure
+-/
+inductive RTCl {A} (P: Relation A): Relation A where
+  | refl {a}: RTCl P a a
+  | step {a b c}: P a b -> RTCl P b c -> RTCl P a c
+
+
+instance {A} {P: Relation A}: Transitive (RTCl P) where
+  trans := by
+    intros a b c Hab
+    induction Hab with
+    | refl => solve_by_elim
+    | @step a t b Hat Htb IHtb =>
+      intros Hbc
+      specialize (IHtb Hbc)
+      constructor
+      . apply Hat
+      . apply IHtb
+
+
+instance RTCl.close {A} (P: Relation A): Closure RTPred P (RTCl P) where
+  sub := SubRel.mk $ by
+    intros a b H
+    apply RTCl.step H .refl
+  pred := by
+    constructor
+    . /- Reflexive -/
+      apply Reflexive.mk RTCl.refl
+    . /- Transitive -/
+      constructor
+      intros a b c
+      apply (RTCl P).trans
+  least := by
+    intros Q inst sub
+    let inst_refl := inst.left
+    let inst_trans := inst.right
+    apply SubRel.mk
+    intros a b H
+    induction H with
+    | refl =>
+      apply Q.refl
+    | @step a t b Hat Htb IH =>
+      apply Q.trans
+      . apply sub.inclusion Hat
+      . apply IH
+
+
+instance rtcl_cl_op {A: Type}: ClosureOp RTPred RTCl (A := A) where
+  close := RTCl.close
+
+instance {A} {P: Relation A}: Reflexive (RTCl P) where
+  refl := RTCl.refl
+
+
 /-!
 Then, the equivalence relation
 -/
