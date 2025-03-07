@@ -7,6 +7,12 @@ class Reflexive {A} (P: Relation A) where
 def Relation.refl {A: Type} {P: Relation A} [inst: Reflexive P]:
   forall {a: A}, P a a := inst.refl
 
+class Irreflexive {A} (P: Relation A) where
+  irrefl: forall {a: A}, Not (P a a)
+
+def Relation.irrefl {A: Type} {P: Relation A} [inst: Irreflexive P]:
+  forall {a: A}, Not (P a a) := inst.irrefl
+
 
 class Antisymmetric {A} (P: Relation A) where
   anti: forall {a b: A}, P a b -> P b a -> a = b
@@ -27,6 +33,23 @@ class Symmetric {A} (P: Relation A) where
 
 def Relation.symm {A} {P: Relation A} [inst: Symmetric P]:
   forall {a b: A}, P a b -> P b a := inst.symm
+
+class Congruence {A: Type} (P: Relation A) (S: A -> A) where
+  rel_cong: forall {a b: A}, (P a b) -> P (S a) (S b)
+
+
+class KeepCong {A: Type} (P Q: Relation A) where
+  keep_cong: forall (f: A -> A),
+    (forall {a b}, (P a b) -> P (f a) (f b)) ->
+    forall {a b}, (Q a b) -> Q (f a) (f b)
+
+
+def Relation.keep_cong {A: Type}
+  {P Q: Relation A} (f: A -> A)
+  [inst: KeepCong P Q]:
+    (forall {a b}, (P a b) -> P (f a) (f b)) ->
+    forall {a b}, (Q a b) -> Q (f a) (f b) :=
+    inst.keep_cong f
 
 
 class SubRel {A} (P: Relation A) (Q: Relation A): Prop where
@@ -191,6 +214,11 @@ instance {A} {P: Relation A}: Transitive (RTCl P) where
       . apply IHtb
 
 
+def RTCl.trans {A} {P: Relation A}: forall {a b c},
+  RTCl P a b -> RTCl P b c -> RTCl P a c
+:= (RTCl P).trans
+
+
 instance RTCl.close {A} (P: Relation A): Closure RTPred P (RTCl P) where
   sub := SubRel.mk $ by
     intros a b H
@@ -202,7 +230,7 @@ instance RTCl.close {A} (P: Relation A): Closure RTPred P (RTCl P) where
     . /- Transitive -/
       constructor
       intros a b c
-      apply (RTCl P).trans
+      apply RTCl.trans
   least := by
     intros Q inst sub
     let inst_refl := inst.left
@@ -223,6 +251,17 @@ instance rtcl_cl_op {A: Type}: ClosureOp RTPred RTCl (A := A) where
 
 instance {A} {P: Relation A}: Reflexive (RTCl P) where
   refl := RTCl.refl
+
+
+instance {A} {P: Relation A}: KeepCong P (RTCl P) where
+  keep_cong := by
+    intros f HP a b HC
+    induction HC with
+    | @refl =>
+      apply RTCl.refl
+    | @step a b c Hab Hbc IHbc =>
+      specialize (HP Hab)
+      apply RTCl.step HP IHbc
 
 
 /-!
@@ -280,3 +319,162 @@ instance {A} {P: Relation A}: Transitive (ECl P) where
 
 instance {A} {P: Relation A}: Symmetric (ECl P) where
   symm := ECl.symm
+
+
+instance {A} {P: Relation A}: KeepCong P (ECl P) where
+  keep_cong := by
+    intros f HP a b HC
+    induction HC with
+    | @inclusion a b H =>
+      apply ECl.inclusion (HP H)
+    | @refl =>
+      apply ECl.refl
+    | @trans a b c Hab Hac IHab IHac =>
+      apply ECl.trans IHab IHac
+    | @symm a b Hab IHab =>
+      apply ECl.symm IHab
+
+
+/-!
+Now, we prove Church-Rosser property implies the uniqueness of normal forms.
+-/
+
+
+/--
+Normal terms with respect to a reduction
+-/
+def Relation.Normal {A: Type} (R: Relation A) (x: A) := Not (exists y, R x y)
+/--
+Normal terms with respect to multi step reduction
+-/
+def Relation.MNormal {A: Type} (R: Relation A) (x: A) := forall {y}, RTCl R x y -> x = y
+
+
+def Relation.Normal.MNormal {A: Type} {R: Relation A}:
+  forall {x: A}, R.Normal x -> R.MNormal x
+:= by
+  intros n HR m HMR
+  induction HMR with
+  | @refl x =>
+    eq_refl
+  | @step a b c Hab Hbc Hbc =>
+    exfalso
+    apply HR
+    constructor
+    apply Hab
+
+
+theorem Relation.MNormal.Normal {A: Type} {R: Relation A} [Irreflexive R]:
+  forall {x: A}, R.MNormal x -> R.Normal x
+:= by
+  intros n HMR Hx
+  let ⟨x, Hx⟩ := Hx
+  have E: n = x := by
+    apply HMR
+    apply R.super
+    exact Hx
+  rewrite [E] at Hx
+  apply R.irrefl Hx
+
+
+
+/-!
+# Uniqueness of reduction
+Semi-confluence, confluence, and Church-Rosser
+-/
+
+class SemiConfluent {A: Type} (P: Relation A) where
+  semi_confl: forall {m1 m2 m3: A}, P m1 m2 -> RTCl P m1 m3 -> exists m4, RTCl P m2 m4 /\ RTCl P m3 m4
+
+
+def Relation.semi_confl {A: Type} (P: Relation A) [inst: SemiConfluent P]
+  {m1 m2 m3: A} := inst.semi_confl (m1 := m1) (m2 := m2) (m3 := m3)
+
+
+class Confluent {A: Type} (P: Relation A) where
+  confl: forall {m1 m2 m3: A},
+    RTCl P m1 m2 -> RTCl P m1 m3 -> exists m4, RTCl P m2 m4 /\ RTCl P m3 m4
+
+
+def Relation.confl {A: Type} (P: Relation A) [inst: Confluent P]
+  {m1 m2 m3: A} := inst.confl (m1 := m1) (m2 := m2) (m3 := m3)
+
+
+class ChurchRosser {A: Type} (P: Relation A) where
+  church_rosser: forall {m2 m3: A},
+    ECl P m2 m3 -> exists m4, RTCl P m2 m4 /\ RTCl P m3 m4
+
+def Relation.church_rosser {A: Type} (P: Relation A) [inst: ChurchRosser P]
+  {m2 m3: A} := inst.church_rosser (m2 := m2) (m3 := m3)
+
+
+instance Relation.semi_confl_to_confl {A: Type} (P: Relation A)
+  [inst: SemiConfluent P]: Confluent P where
+  confl := by
+    intros m1 m2 m3
+    intros H12
+    revert m3
+    induction H12 with
+    | @refl x =>
+      intros m3 H13
+      exists m3
+      apply And.intro
+      . apply H13
+      . apply RTCl.refl
+    | @step m1 b m2 H1b Hb2 IH =>
+      intros m3 H13
+      let ⟨x, ⟨Hbx, H3x⟩⟩ := inst.semi_confl H1b H13
+      let ⟨m4, ⟨H24, Hx4⟩⟩ := IH Hbx
+      exists m4
+      apply And.intro
+      . apply H24
+      . apply RTCl.trans H3x Hx4
+
+
+instance Relation.confl_to_ChRo {A: Type} (P: Relation A)
+  [inst: Confluent P]: ChurchRosser P where
+  church_rosser := by
+    intros m2 m3 H
+    induction H with
+    | @inclusion a b Hab =>
+      apply inst.confl
+      . apply RTCl.refl
+      . apply P.super Hab
+    | @refl x =>
+      exists x
+      apply And.intro
+      . apply RTCl.refl
+      . apply RTCl.refl
+    | @trans a b c Hab Hbc IHab IHbc =>
+      let ⟨x, ⟨Hax, Hbx⟩⟩ := IHab
+      let ⟨y, ⟨Hby, Hcy⟩⟩ := IHbc
+      let ⟨m4, ⟨Hxm4, Hym4⟩⟩ := inst.confl Hbx Hby
+      exists m4
+      apply And.intro
+      . apply RTCl.trans Hax Hxm4
+      . apply RTCl.trans Hcy Hym4
+    | @symm a b Hab IHab =>
+      let ⟨m4, ⟨H1, H2⟩⟩ := IHab
+      exists m4
+
+
+class Relation.NormalFormUnique {A} (R: Relation A) where
+  normal_formal_unique: forall {n m1 m2: A},
+    RTCl R n m1 -> RTCl R n m2 ->
+    R.Normal m1 -> R.Normal m2 ->
+    m1 = m2
+
+
+instance Relation.ChRo_normal_form_unique
+  {A: Type}
+  {R: Relation A}
+  [inst: Confluent R]
+: R.NormalFormUnique where
+  normal_formal_unique := by
+    intros n m1 m2
+    intros r1 r2 N1 N2
+    have ⟨m4, ⟨H14, H24⟩⟩ := inst.confl r1 r2
+    have E1 := N1.MNormal H14
+    have E2 := N2.MNormal H24
+    subst_eqs
+    eq_refl
