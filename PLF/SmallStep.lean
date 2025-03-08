@@ -436,3 +436,63 @@ notation:60 t1 "/" st1:75 "c->" t2:75 "/" st2 => Imp.step (t1, st1) (t2, st2)
 abbrev Imp.multistep := RTCl Imp.step
 
 notation:60 t1 "/" st1:75 "c->*" t2:75 "|" st2 => Imp.multistep (t1, st1) (t2, st2)
+
+
+section StackCalculator
+
+abbrev Stack := List Nat
+abbrev Prog := List SInstr
+
+inductive StackStep (st : State) : Relation (Prog × Stack) where
+  | Push {stk n p}:
+    StackStep st (.SPush n :: p, stk) (p, n :: stk)
+  | Load {stk i p}:
+    StackStep st (.SLoad i :: p, stk) (p, st i :: stk)
+  | Plus {stk n m p}:
+    StackStep st (.SPlus :: p, n::m::stk) (p, (m+n)::stk)
+  | Minus {stk n m p}:
+    StackStep st (.SMinus :: p, n::m::stk) (p, (m-n)::stk)
+  | Mult {stk n m p}:
+    StackStep st (.SMult :: p, n::m::stk) (p, (m*n)::stk)
+
+
+theorem StackStep.deterministic {st p s p1 s1 p2 s2}:
+  StackStep st (p, s) (p1, s1) ->
+  StackStep st (p, s) (p2, s2) ->
+  (p1, s1) = (p2, s2)
+:= by
+  intros H1 H2
+  cases p with
+  | nil =>
+    cases H1
+  | cons x xs =>
+    cases x with (cases H1 <;> cases H2 <;> eq_refl)
+
+
+abbrev StackMultiStep st := RTCl (StackStep st)
+
+
+-- The original correctness is the big step. We only compare the
+-- final state. Now, I want to compare some intermediate state by
+-- the multistep relation.
+theorem AExp.s_compile.step_correct {st: State} {e: AExp} {stk prog}:
+  StackMultiStep st (e.s_compile ++ prog, stk) (prog, st.aeval e::stk)
+:= by
+  revert stk prog
+  induction e with
+  | Num n | Var x =>
+    intros stk prog
+    simp
+    apply (StackStep st).super
+    constructor
+  | Plus n1 n2 IH1 IH2 | Minus _ _ IH1 IH2 | Mult _ _ IH1 IH2 =>
+    intros stk prog
+    simp
+    apply RTCl.trans
+    . apply IH1
+    . apply RTCl.trans
+      . apply IH2
+      . apply (StackStep st).super
+        constructor
+
+end StackCalculator
