@@ -11,8 +11,14 @@ def TotalMap.update {A: Type} (m: TotalMap A) (x: String) (v: A): TotalMap A
   := fun x' => if x' == x then v else m x'
 
 @[simp]
-def Partial.update {A: Type} (m: PartialMap A) (x: String) (v: A): PartialMap A
+def PartialMap.update {A: Type} (m: PartialMap A) (x: String) (v: A): PartialMap A
   := TotalMap.update m x (Option.some v)
+
+@[simp]
+def PartialMap.merge {A: Type} (m1 m2: PartialMap A): PartialMap A :=
+  fun x => match m1 x with
+    | .some y => y
+    | .none => m2 x
 
 
 declare_syntax_cat lfp_total_map
@@ -102,6 +108,7 @@ theorem PartialMap.update_same {A : Type} {m : PartialMap A} {x} {v: A}:
   map![x => v ; m] = m
 := by
   intros H
+  unfold update
   rewrite [<-H]
   apply TotalMap.update_same
 
