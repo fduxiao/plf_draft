@@ -40,7 +40,7 @@ macro_rules
 declare_syntax_cat plf_stlc_tm (behavior := symbol)
 syntax "[tm|" plf_stlc_tm "]": term
 syntax:100 "(" plf_stlc_tm ")": plf_stlc_tm
-syntax "#[" term "]": plf_stlc_tm
+syntax "[" term "]": plf_stlc_tm
 syntax:11 "if" plf_stlc_tm:5 "then" plf_stlc_tm:5 "else" plf_stlc_tm:5: plf_stlc_tm
 syntax "true": plf_stlc_tm
 syntax "false": plf_stlc_tm
@@ -51,7 +51,7 @@ syntax:0 "λ" "[" term "]" ":" plf_stlc_ty "," plf_stlc_tm: plf_stlc_tm
 
 macro_rules
   | `([tm| if $c:plf_stlc_tm then $t else $f ]) => `(Tm.If [tm| $c ] [tm| $t ] [tm| $f ])
-  | `([tm| #[ $t ] ]) => `((($t): Tm))
+  | `([tm| [ $t ] ]) => `((($t): Tm))
   | `([tm| ($t:plf_stlc_tm) ]) => `([tm| $t ])
   | `([tm| true ]) => `(Tm.True)
   | `([tm| false ]) => `(Tm.False)
@@ -63,7 +63,7 @@ macro_rules
 example: [tm| x y z] = ((Tm.Var "x").App (Tm.Var "y")).App (Tm.Var "z")
 := by eq_refl
 
-example: [tm| λ ["x"]: Bool, #["x"] ] = Tm.Abs "x" Ty.Bool (Tm.Var "x") := by eq_refl
+example: [tm| λ ["x"]: Bool, ["x"] ] = Tm.Abs "x" Ty.Bool (Tm.Var "x") := by eq_refl
 example: [tm| λ x: Bool, λ y: Bool -> Bool, x y ] = Tm.Abs "x" Ty.Bool (
   Tm.Abs "y" (Ty.Bool.To Ty.Bool) (
     (Tm.Var "x").App (Tm.Var "y")
@@ -87,7 +87,7 @@ inductive Tm.value: Tm -> Prop where
 def Tm.subst (x: String) (s: Tm) (t: Tm): Tm :=
   match t with
   | .Var y => if x = y then s else t
-  | .Abs y T b => if x = y then t else .Abs x T (subst x s b)
+  | .Abs y T b => if x = y then t else .Abs y T (subst x s b)
   | .App p q => .App (subst x s p) (subst x s q)
   | .True => .True
   | .False => .False
@@ -99,7 +99,7 @@ notation "[" x ":=" s "]" => (Tm.subst x s)
 inductive Tm.step: Tm -> Tm -> Prop where
   | AppAbs {x T b} {v: Tm}: v.value -> ((Tm.Abs x T b).App v).step ([x := v] b)
   | App1 {f1 f2 x: Tm}: f1.step f2 -> (f1.App x).step (f2.App x)
-  | App {f x1 x2: Tm}: x1.step x2 -> (f.App x1).step (f.App x2)
+  | App2 {f x1 x2: Tm}: x1.step x2 -> (f.App x1).step (f.App x2)
   | IfTrue {t f: Tm}: (Tm.If .True t f).step t
   | IfFalse {t f: Tm}: (Tm.If .False t f).step f
   | If {c1 c2 t f: Tm}: c1.step c2 -> (Tm.If c1 t f).step (Tm.If c2 t f)
@@ -112,7 +112,7 @@ def idB := [tm| λ x: Bool, x]
 @[simp]
 def idBB := [tm| λ x: Bool -> Bool, x]
 
-example: [tm| #[idBB] #[idB] ].multistep idB := by
+example: [tm| [idBB] [idB] ].multistep idB := by
   apply RTCl.step
   . unfold idBB
     apply Tm.step.AppAbs
@@ -122,7 +122,7 @@ example: [tm| #[idBB] #[idB] ].multistep idB := by
 
 
 abbrev Context := PartialMap Ty
-def Context.empty: Context := PartialMap.empty
+abbrev Context.empty: Context := PartialMap.empty
 
 declare_syntax_cat plf_stlc_context (behavior := symbol)
 syntax "∅": lfp_aexp
@@ -138,7 +138,7 @@ macro_rules
   | `([ctx| $x:ident : $T]) => `(
     PartialMap.update .empty $(Lean.quote (toString x.getId)) [ty| $T ]
   )
-  | `([ctx| [$x] : $T]) => `(PartialMap.update $x [ty| $T])
+  | `([ctx| [$x] : $T]) => `(PartialMap.update .empty $x [ty| $T])
   | `([ctx| $c1, $c2 ]) => `(PartialMap.merge [ctx| $c1] [ctx| $c2])
 
 
@@ -171,6 +171,9 @@ inductive Tm.has_type: Context -> Tm -> Ty -> Prop where
     Tm.has_type Gamma t A ->
     Tm.has_type Gamma f A ->
     Tm.has_type Gamma (.If c t f) A
+
+
+def Tm.has_type.type {c t T} (_: Tm.has_type c t T) := T
 
 
 macro "ty{" C:plf_stlc_context "|-" t:plf_stlc_tm ":" T:plf_stlc_ty "}": term

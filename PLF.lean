@@ -10,3 +10,4 @@ import PLF.HoareAsLogic
 import PLF.SmallStep
 import PLF.Types
 import PLF.Stlc
+import PLF.StlcProp

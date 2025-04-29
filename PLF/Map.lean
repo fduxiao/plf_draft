@@ -83,12 +83,18 @@ theorem TotalMap.update_same {A : Type} {m : TotalMap A} {x}:
 
 theorem TotalMap.update_permute {A: Type} {m : TotalMap A} {x1 x2 v1 v2}:
   x1 ≠ x2 ->
-  map![x1 => v1 ; x2 => v2 ; m] =  map![x1 => v1 ; x2 => v2 ; m]
+  map![x1 => v1 ; x2 => v2 ; m] =  map![x2 => v2 ; x1 => v1 ; m]
 := by
   intros H
   apply funext
   intros y
   simp [update]
+  cases y.decEq x1 with
+  | isTrue E =>
+    subst E
+    simp [H]
+  | isFalse NE =>
+    simp [NE]
 
 
 theorem PartialMap.apply_empty {A: Type} {x: String}:
@@ -113,14 +119,15 @@ theorem PartialMap.update_same {A : Type} {m : PartialMap A} {x} {v: A}:
   apply TotalMap.update_same
 
 
-def PartialMap.inclusion {A: Type} (m m': PartialMap A) :=
+@[simp]
+def PartialMap.included_in {A: Type} (m m': PartialMap A) :=
   forall x v, m x = .some v -> m' x = .some v
 
 
-theorem inclusion_update {A: Type} {m m' : PartialMap A}
+theorem PartialMap.included_in_update {A: Type} {m m' : PartialMap A}
   {x : String} {vx : A}:
-  m.inclusion m' ->
-  PartialMap.inclusion (map![x => vx ; m]) map![x => vx ; m']
+  m.included_in m' ->
+  (map![x => vx ; m]).included_in map![x => vx ; m']
 := by
   intros H
   intros y vy
@@ -130,3 +137,39 @@ theorem inclusion_update {A: Type} {m m' : PartialMap A}
   | isFalse Hxy =>
     simp [TotalMap.update, Hxy]
     apply H
+
+
+theorem PartialMap.empty_merge {A: Type} {m: PartialMap A}
+:
+  PartialMap.empty.merge m = m
+:= by
+  apply funext
+  intros x
+  simp
+
+
+theorem PartialMap.merge_empty {A: Type} {m: PartialMap A}
+:
+  m.merge .empty = m
+:= by
+  apply funext
+  intros x
+  unfold merge
+  split
+  . symm
+    assumption
+  . simp
+    symm
+    assumption
+
+
+theorem PartialMap.empty_update_merge {A: Type} {m: PartialMap A}
+  {x: String} {v: A}
+:
+  (PartialMap.empty.update x v).merge m = m.update x v
+:= by
+  apply funext
+  intros y
+  simp
+  cases y.decEq x with
+  | _ H => simp [H]
