@@ -105,7 +105,8 @@ inductive Tm.step: Tm -> Tm -> Prop where
   | If {c1 c2 t f: Tm}: c1.step c2 -> (Tm.If c1 t f).step (Tm.If c2 t f)
 
 
-def Tm.multistep := RTCl (Tm.step)
+abbrev Tm.multistep := RTCl (Tm.step)
+abbrev Tm.step_normal := Relation.Normal Tm.step
 
 @[simp]
 def idB := [tm| λ x: Bool, x]

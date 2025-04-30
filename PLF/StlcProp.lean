@@ -281,4 +281,82 @@ theorem not_subject_expansion:
       cases Hf with | Var H =>
       simp at H
 
+
+theorem step_normal_value: forall {t: Tm} {T},
+  ty{ ∅ |- [t]: [T]} ->
+  t.step_normal ->
+  t.value
+:= by
+  intro t T HT Hs
+  have H := progress HT
+  cases H with
+  | inl H =>
+    exact H
+  | inr H =>
+    exfalso
+    apply Hs
+    exact H
+
+
+abbrev stuck (t: Tm) : Prop :=
+  t.step_normal ∧ ¬ t.value
+
+theorem type_soundness: forall {t t': Tm} {T},
+  ty{ ∅ |- [t] : [T] } ->
+  t.multistep t' ->
+  ¬(stuck t')
+:= by
+  intro t t' T HT HMR ⟨Hnf, Hnv⟩
+  induction HMR with
+  | @refl t =>
+    apply Hnv
+    apply step_normal_value
+    . exact HT
+    . exact Hnf
+  | step Hs HMR IH =>
+    apply IH
+    . apply preservation
+      . apply HT
+      . apply Hs
+    . exact Hnf
+    . exact Hnv
+
+
+theorem type_uniquess: forall {Gamma e T T'},
+  ty{ Gamma |- [e]: [T]} ->
+  ty{ Gamma |- [e]: [T']} ->
+  T = T'
+:= by
+  intro Gamma e
+  revert Gamma
+  induction e with (intros Gamma T T' HT HT')
+  | Var x =>
+    cases HT with | Var HT =>
+    cases HT' with | Var HT' =>
+    rewrite [HT'] at HT
+    cases HT
+    eq_refl
+  | App f x IHf IHx =>
+    cases HT with | App Hf Hx =>
+    cases HT' with | App Hf' Hx' =>
+    specialize (IHf Hf Hf')
+    cases IHf
+    eq_refl
+  | Abs x A b IHb =>
+    cases HT with | Abs Hb =>
+    cases HT' with | Abs Hb' =>
+    specialize (IHb Hb Hb')
+    rewrite [IHb]
+    eq_refl
+  | True | False =>
+    cases HT
+    cases HT'
+    eq_refl
+  | If c t f IHc IHt IHf =>
+    cases HT with | If Hc Ht Hf =>
+    cases HT' with | If Hc' Ht' Hf' =>
+    specialize (IHt Ht Ht')
+    exact IHt
+
+
 end StlcProp
