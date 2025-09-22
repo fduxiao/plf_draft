@@ -488,9 +488,9 @@ theorem AExp.s_compile.step_correct {st: State} {e: AExp} {stk prog}:
   | Plus n1 n2 IH1 IH2 | Minus _ _ IH1 IH2 | Mult _ _ IH1 IH2 =>
     intros stk prog
     simp
-    apply RTCl.trans
+    apply Relation.trans
     . apply IH1
-    . apply RTCl.trans
+    . apply Relation.trans
       . apply IH2
       . apply (StackStep st).super
         constructor

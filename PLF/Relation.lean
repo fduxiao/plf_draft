@@ -7,6 +7,8 @@ class Reflexive {A} (P: Relation A) where
 def Relation.refl {A: Type} {P: Relation A} [inst: Reflexive P]:
   forall {a: A}, P a a := inst.refl
 
+macro "rel_refl": tactic => `(tactic| apply Relation.refl)
+
 class Irreflexive {A} (P: Relation A) where
   irrefl: forall {a: A}, Not (P a a)
 
@@ -27,6 +29,8 @@ class Transitive {A} (P: Relation A) where
 def Relation.trans {A: Type} {P: Relation A} [inst: Transitive P]:
   forall {a b c: A}, P a b -> P b c -> P a c := inst.trans
 
+
+macro "rel_trans": tactic => `(tactic| apply Relation.trans)
 
 class Symmetric {A} (P: Relation A) where
   symm: forall {a b: A}, P a b -> P b a
@@ -214,9 +218,16 @@ instance {A} {P: Relation A}: Transitive (RTCl P) where
       . apply IHtb
 
 
-def RTCl.trans {A} {P: Relation A}: forall {a b c},
-  RTCl P a b -> RTCl P b c -> RTCl P a c
-:= (RTCl P).trans
+theorem RTCl.inclusion {A} {P: Relation A}: forall {a b},
+  P a b -> RTCl P a b
+:= by
+  intro a b H
+  apply RTCl.step H
+  apply RTCl.refl
+
+
+macro "rtcl_incl": tactic => `(tactic| apply RTCl.inclusion)
+macro "rtcl_step": tactic => `(tactic| apply RTCl.step)
 
 
 instance RTCl.close {A} (P: Relation A): Closure RTPred P (RTCl P) where
@@ -230,7 +241,7 @@ instance RTCl.close {A} (P: Relation A): Closure RTPred P (RTCl P) where
     . /- Transitive -/
       constructor
       intros a b c
-      apply RTCl.trans
+      apply Relation.trans
   least := by
     intros Q inst sub
     let inst_refl := inst.left
@@ -428,7 +439,7 @@ instance Relation.semi_confl_to_confl {A: Type} (P: Relation A)
       exists m4
       apply And.intro
       . apply H24
-      . apply RTCl.trans H3x Hx4
+      . apply Relation.trans H3x Hx4
 
 
 instance Relation.confl_to_ChRo {A: Type} (P: Relation A)
@@ -451,8 +462,8 @@ instance Relation.confl_to_ChRo {A: Type} (P: Relation A)
       let ⟨m4, ⟨Hxm4, Hym4⟩⟩ := inst.confl Hbx Hby
       exists m4
       apply And.intro
-      . apply RTCl.trans Hax Hxm4
-      . apply RTCl.trans Hcy Hym4
+      . apply Relation.trans Hax Hxm4
+      . apply Relation.trans Hcy Hym4
     | @symm a b Hab IHab =>
       let ⟨m4, ⟨H1, H2⟩⟩ := IHab
       exists m4
