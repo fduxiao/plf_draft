@@ -7,6 +7,14 @@ import PLF.Map
 
 namespace STLCRef
 
+declare_syntax_cat my_ident
+scoped syntax ident: my_ident
+scoped syntax "[" term "]": my_ident
+scoped syntax "[ident|" my_ident "]": term
+scoped macro_rules
+  | `([ident| $x:ident ]) => `($(Lean.quote (toString x.getId)))
+  | `([ident| [$x:term] ]) => `($x)
+
 inductive Ty where
   | Nat: Ty
   | Unit: Ty
@@ -173,7 +181,19 @@ def unexpandAbs: Lean.PrettyPrinter.Unexpander
   | `($_ $x:str [ty| $T ] [tm| $b ]) =>
     let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
     `([tm| λ $name : $T, $b ])
+  | `($_ $x:str $T [tm| $b ]) =>
+    let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    `([tm| λ $name : [$T], $b ])
+  | `($_ $x:str [ty| $T ] $b) =>
+    let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    `([tm| λ $name : $T, [$b] ])
+  | `($_ $x:str $T $b) =>
+    let name := Lean.mkIdent (Lean.Name.mkStr1 x.getString)
+    `([tm| λ $name : [$T], [$b] ])
   | `($_ $x:term [ty| $T ] [tm| $b ]) => `([tm| λ [$x] : $T, $b ])
+  | `($_ $x:term [ty| $T ] $b) => `([tm| λ [$x] : $T, [$b] ])
+  | `($_ $x:term $T [tm| $b ]) => `([tm| λ [$x] : [$T], $b ])
+  | `($_ $x:term $T $b) => `([tm| λ [$x] : [$T], [$b] ])
   | _ => throw ()
 
 
@@ -237,6 +257,9 @@ def unexpandLoc: Lean.PrettyPrinter.Unexpander
 @[app_unexpander Tm.Assign]
 def unexpandAssign: Lean.PrettyPrinter.Unexpander
   | `($_ [tm| $x] [tm| $y]) => `([tm| $x := $y ])
+  | `($_ $x [tm| $y]) => `([tm| [$x] := $y ])
+  | `($_ [tm| $x] $y:term) => `([tm| $x := [$y] ])
+  | `($_ $x:term $y:term) => `([tm| [$x] := [$y] ])
   | _ => throw ()
 
 
@@ -275,10 +298,24 @@ def Tm.subst (t: Tm) (x: String) (s: Tm): Tm :=
   | .Loc _ => t
 
 
-scoped macro "subst" t:term "[" x:ident ":=" v:plf_stlc_ref_tm "]": term =>
-  `(Tm.subst $t $(Lean.quote (toString x.getId)) [tm| $v ])
-scoped macro "subst" t:term "[" "[" x:term "]" ":=" v:plf_stlc_ref_tm "]": term =>
-  `(Tm.subst $t $x [tm| $v ])
+declare_syntax_cat subst_cat
+scoped syntax "subst[ " my_ident " := " plf_stlc_ref_tm " ] ": subst_cat
+
+scoped syntax subst_cat: plf_stlc_ref_tm
+
+scoped macro_rules
+  | `([tm| subst[ $x:my_ident := $s:plf_stlc_ref_tm ] $t ]) =>
+    `(Tm.subst [tm| $t ] [ident| $x ] [tm| $s])
+
+@[app_unexpander Tm.subst]
+def unexpandSubst: Lean.PrettyPrinter.Unexpander
+  | `($_subst [tm| $t] $x:str [tm| $s ]) =>
+    let ident := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+    `([tm| (subst[ $ident:ident := $s] $t ) ])
+  | `($_subst [tm| $t] $x:term [tm| $s ]) => `([tm| (subst[ [$x] := $s] $t ) ])
+  | `($_subst $t $x:term $s) => `([tm| (subst[ [$x] := [$s]] [$t] ) ])
+  | _ => throw ()
+
 
 abbrev Store := List Tm
 abbrev Store.lookup (s: Store) (i: Nat): Tm := List.getD s i .Unit
@@ -358,7 +395,7 @@ inductive Tm.step: Relation (Tm × Store) where
     Tm.step (c1.If0 t f, st1) (c2.If0 t f, st2)
   | If0Zero {t f st}:
     Tm.step ([tm| if0 0 then [t] else [f]], st) (t, st)
-  | If0NoneZero {n: Nat} {t f st}:
+  | If0NonZero {n: Nat} {t f st}:
     Tm.step ([tm| if0 [n.succ] then [t] else [f]], st) (f, st)
   -- reference
   | RefValue {v: Tm} {st}:
@@ -374,7 +411,7 @@ inductive Tm.step: Relation (Tm × Store) where
   | Assign {v: Tm} {i} {st: Store}:
     v.Value ->
     i < st.length ->
-    Tm.step ([tm| (loc i) := v], st) (.Unit, st.replace i v)
+    Tm.step ([tm| (loc i) := [v]], st) (.Unit, st.replace i v)
   | Assign1 {t1 t2 s} {st1 st2}:
     Tm.step (t1, st1) (t2, st2) ->
     Tm.step (t1.Assign s, st1) (t2.Assign s, st2)
@@ -397,6 +434,77 @@ example: mstep[unit / [] ]->[ unit / []] := by
 
 
 abbrev Context := PartialMap Ty
+def Context.empty := PartialMap.empty (A := Ty)
+
+declare_syntax_cat plf_stlc_ref_context (behavior := symbol)
+syntax "[]": plf_stlc_ref_context
+syntax term: plf_stlc_ref_context
+syntax my_ident " : " plf_stlc_ref_ty: plf_stlc_ref_context
+syntax plf_stlc_ref_context ", " plf_stlc_ref_context: plf_stlc_ref_context
+syntax "[ctx| " plf_stlc_ref_context " ]": term
+
+macro_rules
+  | `([ctx| [] ]) => `(Context.empty)
+  | `([ctx| $t:term ]) => `($t)
+  | `([ctx| $x:my_ident : $T]) => `(
+      PartialMap.update Context.empty [ident| $x ] [ty| $T ]
+    )
+  | `([ctx| $x:my_ident : $T, $G]) => `(
+      PartialMap.update [ctx| $G ] [ident| $x ] [ty| $T ]
+    )
+  | `([ctx| $c1, $c2 ]) => `(PartialMap.merge [ctx| $c1] [ctx| $c2])
+
+
+instance : Coe Lean.Term (Lean.TSyntax `plf_stlc_ref_context) where
+  coe s := ⟨s.raw⟩
+
+@[app_unexpander Context.empty]
+def unexpandContext_empty: Lean.PrettyPrinter.Unexpander
+  | `($_ $x) => `([ctx| [] ] $x)
+  | `($_) => `([ctx| [] ])
+
+
+@[app_unexpander PartialMap.update]
+def unexpandContext_update: Lean.PrettyPrinter.Unexpander
+  -- | `($_ $_ $x:str [ty| $v]) =>
+  --   let name := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+  --   `([ctx| $name:ident : $v ])
+  -- variables
+  | `($_ [ctx| [] ] $x:str [ty| $v]) =>
+    let name := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+    `([ctx| $name:ident : $v ])
+  | `($_ [ctx| $G ] $x:str [ty| $v]) =>
+    let name := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+    `([ctx| $name:ident : $v, $G ])
+  | `($_ [ctx| [] ] $x:str $v) =>
+    let name := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+    `([ctx| $name:ident : [$v]])
+  | `($_ [ctx| $G ] $x:str $v) =>
+    let name := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+    `([ctx| $name:ident : [$v], $G ])
+  | `($_ $G $x:str [ty| $v]) =>
+    let name := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+    `([ctx| $name:ident : $v, $G ])
+  | `($_ $G $x:str $v) =>
+    let name := Lean.mkIdent (Lean.Name.mkSimple x.getString)
+    `([ctx| $name:ident : [$v], $G ])
+  -- terms
+  | `($_ [ctx| [] ] $x:term [ty| $v]) => `([ctx| [$x] : $v ])
+  | `($_ [ctx| $G ] $x:term [ty| $v]) => `([ctx| [$x] : $v, $G ])
+  | `($_ [ctx| [] ] $x:term $v) => `([ctx| [$x] : [$v]])
+  | `($_ [ctx| $G ] $x:term $v) => `([ctx| [$x] : [$v], $G ])
+  | `($_ $G $x:term [ty| $v]) => `([ctx| [$x] : $v, $G ])
+  | `($_ $G $x:term $v) => `([ctx| [$x] : [$v], $G ])
+  | _ => throw ()
+
+
+@[app_unexpander PartialMap.merge]
+def unexpandContext_merge: Lean.PrettyPrinter.Unexpander
+  | `($_ [ctx| $x] [ctx| $y]) => `([ctx| $x, $y ])
+  | `($_ [ctx| $x] $y) => `([ctx| $x, $y ])
+  | `($_ $x [ctx| $y]) => `([ctx| $x, $y ])
+  | `($_ $x $y) => `([ctx| $x, $y ])
+  | _ => throw ()
 
 
 -- cyclic store
@@ -429,5 +537,635 @@ theorem Tm.cyclic_store:
     apply Tm.step.Seq2
     constructor
 
+
+abbrev StoreTy := List Ty
+abbrev StoreTy.lookup (s: StoreTy) (i: Nat): Ty := List.getD s i .Unit
+abbrev StoreTy.replace (s: StoreTy) (i: Nat) (v: Ty): StoreTy := List.set s i v
+
+inductive StoreTy.has_type (ST: StoreTy): Context -> Tm -> Ty -> Prop where
+  | Var {Gamma: Context} {x T}:
+    Gamma x = .some T ->
+    ST.has_type Gamma x T
+  | Abs {Gamma: Context} {x M A B}:
+    ST.has_type map![x => A; Gamma] M B ->
+    ST.has_type Gamma [tm| λ [x]: [A], [M]] (.Arrow A B)
+  | App {Gamma A B f x}:
+    ST.has_type Gamma f (A.Arrow B) ->
+    ST.has_type Gamma x A ->
+    ST.has_type Gamma (f.App x) B
+  | Seq {Gamma A B t1 t2}:
+    ST.has_type Gamma t1 A ->
+    ST.has_type Gamma t2 B ->
+    ST.has_type Gamma (t1.Seq t2) B
+  | Nat {Gamma} {n: Nat}:
+    ST.has_type Gamma (.Const n) .Nat
+  | Succ {Gamma t}:
+    ST.has_type Gamma t .Nat ->
+    ST.has_type Gamma t.Succ .Nat
+  | Pred {Gamma t}:
+    ST.has_type Gamma t .Nat ->
+    ST.has_type Gamma t.Pred .Nat
+  | Mult {Gamma t1 t2}:
+    ST.has_type Gamma t1 .Nat ->
+    ST.has_type Gamma t2 .Nat ->
+    ST.has_type Gamma (t1.Mult t2) .Nat
+  | If0 {Gamma c t f T}:
+    ST.has_type Gamma c .Nat ->
+    ST.has_type Gamma t T ->
+    ST.has_type Gamma f T ->
+    ST.has_type Gamma (.If0 c t f) T
+  | Unit {Gamma}:
+    ST.has_type Gamma .Unit .Unit
+  | Loc {Gamma i T}:
+    i < ST.length ->
+    T = ST.lookup i ->
+    ST.has_type Gamma (.Loc i) (.Ref T)
+  | Ref {Gamma t T}:
+    ST.has_type Gamma t T ->
+    ST.has_type Gamma (.Ref t) (.Ref T)
+  | Deref {Gamma t T}:
+    ST.has_type Gamma t (.Ref T) ->
+    ST.has_type Gamma t.Deref T
+  | Assign {Gamma t1 t2 T}:
+    ST.has_type Gamma t1 (.Ref T) ->
+    ST.has_type Gamma t2 T ->
+    ST.has_type Gamma (.Assign t1 t2) .Unit
+
+scoped macro "ty{ " G:plf_stlc_ref_context " // " st:term " |- " t:plf_stlc_ref_tm " : " T:plf_stlc_ref_ty " }": term
+  => `(StoreTy.has_type $st [ctx| $G ] [tm| $t ] [ty| $T ])
+
+
+@[app_unexpander StoreTy.has_type]
+def unexpandhas_type: Lean.PrettyPrinter.Unexpander
+  | `($_ $st [ctx| $G ] [tm| $t ] [ty| $T ]) => `(ty{ $G // $st |- $t : $T})
+  | `($_ $st [ctx| $G ] [tm| $t ] $T) => `(ty{ $G // $st |- $t : [$T]})
+  | `($_ $st [ctx| $G ] $t [ty| $T]) => `(ty{ $G // $st |- [$t] : $T})
+  | `($_ $st [ctx| $G ] $t $T) => `(ty{ $G // $st |- [$t] : [$T]})
+  | `($_ $st $G [tm| $t ] [ty| $T ]) => `(ty{ $G // $st |- $t : $T})
+  | `($_ $st $G $t [ty| $T ]) => `(ty{ $G // $st |- [$t] : $T})
+  | `($_ $st $G [tm| $t] $T) => `(ty{ $G // $st |- $t : [$T]})
+  | `($_ $st $G $t $T) => `(ty{ $G // $st |- [$t] : [$T]})
+  | _ => throw ()
+
+
+def StoreTy.well_typed (ST: StoreTy) (st: Store) :=
+  st.length = ST.length ∧ (
+    forall i, i < st.length ->
+      ty{ [] // ST |- [st.lookup i] : [ST.lookup i] }
+  )
+
+
+theorem StoreTy.not_unique:
+  ∃ st, ∃ (ST1 ST2: StoreTy),
+    ST1.well_typed st ∧
+    ST2.well_typed st ∧
+    ST1 ≠ ST2
+:= by
+  let st := [[tm| !loc 0]]
+  let ST1 := [[ty| Unit]]
+  let ST2 := [[ty| Nat]]
+  exists st
+  exists ST1
+  exists ST2
+  apply And.intro
+  . -- ST1.well_typed st
+    apply And.intro
+    . simp [st, ST1]
+    . simp [st, ST1] at * <;>
+        solve_by_elim
+  apply And.intro
+  . -- ST2.well_typed st
+    apply And.intro
+    . simp [st, ST2]
+    . simp [st, ST2] at *
+      constructor
+      constructor
+      simp
+      simp
+  . -- ST1 ≠ ST2
+    simp [ST1, ST2]
+
+
+inductive StoreTy.Extends : StoreTy -> StoreTy -> Prop where
+  | nil {ST: StoreTy}: ST.Extends .nil
+  | cons {x} {ST1 ST2: StoreTy}:
+    ST1.Extends ST2 ->
+    StoreTy.Extends (x::ST1) (x::ST2)
+
+
+theorem StoreTy.extends_lookup {i} {ST1 ST2: StoreTy}:
+  i < ST1.length ->
+  ST2.Extends ST1 ->
+  ST1.lookup i = ST2.lookup i
+:= by
+  induction ST1 generalizing i ST2 with
+  | nil =>
+    simp
+  | cons x xs IH =>
+    intro Hlen HST2
+    cases ST2 with
+    | nil =>
+      cases HST2
+    | cons y ys =>
+      cases HST2 with | cons H =>
+      cases i with
+      | zero =>
+        simp
+      | succ n =>
+        simp at Hlen
+        specialize (IH Hlen H)
+        simp at *
+        exact IH
+
+
+theorem StoreTy.length_extends {i} {ST1 ST2: StoreTy}:
+  i < ST1.length ->
+  ST2.Extends ST1 ->
+  i < ST2.length
+:= by
+  induction ST1 generalizing i ST2 with
+  | nil =>
+    simp
+  | cons x xs IH =>
+    intro Hlen Hext
+    cases i with
+    | zero =>
+      cases Hext with | cons H =>
+      simp
+    | succ n =>
+      simp at *
+      cases Hext with | cons H =>
+      simp at *
+      apply IH
+      . exact Hlen
+      . assumption
+
+
+theorem StoreTy.app_extends {ST T: StoreTy}:
+  (ST ++ T).Extends ST
+:= by
+  induction ST with
+  | nil =>
+    simp
+    constructor
+  | cons x xs IH =>
+    constructor
+    exact IH
+
+
+instance: Reflexive StoreTy.Extends where
+  refl := by
+    intro ST
+    induction ST with
+    | nil =>
+      constructor
+    | cons x xs IH =>
+      constructor
+      exact IH
+
+
+@[refl]
+theorem StoreTy.extends_refl {ST: StoreTy}:
+  ST.Extends ST
+:= by
+  rel_refl
+
+
+-- Now, we can prove the preservation theorem.
+theorem Tm.weakening {Gamma1 Gamma2: Context} {ST t T}:
+  Gamma1.included_in Gamma2 ->
+  ty{ Gamma1 // ST |- [t]: [T] } ->
+  ty{ Gamma2 // ST |- [t]: [T] }
+:= by
+  intro Hinc Ht
+  induction Ht generalizing Gamma2 with
+  | _ =>
+    constructor <;>
+      solve_by_elim [PartialMap.included_in_update]
+
+theorem Tm.weakening_empty {Gamma: Context} {ST t T}:
+  ty{ [] // ST |- [t]: [T] } ->
+  ty{ Gamma // ST |- [t]: [T] }
+:= by
+  apply Tm.weakening
+  simp [Context.empty]
+
+
+theorem Tm.subst_preserves_typing {Gamma ST x U t v T}:
+  ty{ [x]: [U], Gamma // ST |- [t]: [T]} ->
+  ty{ [] // ST |- [v]: [U] } ->
+  ty{ Gamma // ST |- (subst[ [x] := [v] ] [t]): [T] }
+:= by
+  intro Ht Hv
+  induction t generalizing Gamma T with
+  | Var y =>
+    cases Ht with | Var Ht =>
+    simp
+    split
+    . /- x = y -/
+      subst_eqs
+      simp at *
+      rewrite [Ht] at Hv
+      apply Tm.weakening_empty
+      assumption
+    . /- x ≠ y -/
+      next Hne =>
+      have Hne: ¬ y = x := by
+        solve_by_elim
+      constructor
+      simp [Hne] at *
+      exact Ht
+  | Abs y A b IHb =>
+    cases Ht with | Abs Hb =>
+    simp
+    split
+    . /- x = y -/
+      subst_eqs
+      constructor
+      apply weakening _ Hb
+      rewrite [PartialMap.update_shadow]
+      simp
+    . /- x ≠ y -/
+      next Hne =>
+      constructor
+      apply IHb
+      rewrite [PartialMap.update_permute Hne]
+      exact Hb
+  | App | Seq
+  | Const | Pred | Succ | Mult | If0
+  | Unit
+  | Ref | Deref | Loc | Assign =>
+    cases Ht <;>
+    constructor <;>
+      solve_by_elim
+
+
+theorem Tm.assign_pres_store_typing {ST: StoreTy} {st i t}:
+  i < ST.length ->
+  ST.well_typed st ->
+  ty{ [] // ST |- [t]: [ST.lookup i]} ->
+  ST.well_typed (st.replace i t)
+:= by
+  intro Hlen HST Ht
+  unfold StoreTy.well_typed
+  apply And.intro
+  . /- length -/
+    simp
+    simp [HST.left]  -- the equality
+  . /- typing -/
+    have H := HST.right
+    intro j Hj
+    simp at Hj
+    cases Nat.decEq i j with
+    | isTrue E =>
+      subst_eqs
+      rewrite [Store.relpace_eq Hj]
+      exact Ht
+    | isFalse NE =>
+      rewrite [Store.replace_neq]
+      . apply H
+        exact Hj
+      . simp
+        solve_by_elim
+
+theorem Store.weakening {Gamma} {ST1 ST2: StoreTy} {t T}:
+  ST2.Extends ST1 ->
+  ty{ Gamma // ST1 |- [t]: [T] } ->
+  ty{ Gamma // ST2 |- [t]: [T] }
+:= by
+  intro HExt HT
+  induction HT with
+  | Var | Abs | App | Seq
+  | Nat | Pred | Succ | Mult | If0
+  | Unit | Ref | Deref | Assign =>
+    solve_by_elim
+  | Loc =>
+    rewrite [StoreTy.extends_lookup] at * <;>
+      solve_by_elim [StoreTy.length_extends]
+
+
+theorem Store.well_typed_app {ST: StoreTy} {st t T}:
+  ST.well_typed st ->
+  ty{ [] // ST |- [t]: [T]} ->
+  (ST ++ [T]).well_typed (st ++ [t])
+:= by
+  intro HST Ht
+  let ⟨Hlen, HST⟩ := HST
+  unfold StoreTy.well_typed
+  apply And.intro
+  . simp
+    exact Hlen
+  . intro i Hi
+    simp at Hi
+    let Hle := Nat.le_of_lt_succ Hi
+    generalize E: st.length = j
+    rewrite [E] at Hle
+    cases Hle with
+    | refl =>
+      have EST: ST.length = i := by
+        rewrite [<-Hlen]
+        assumption
+      simp [E, EST]
+      apply Store.weakening
+      . apply StoreTy.app_extends
+      . exact Ht
+    | step Hle =>
+      have H1: i < st.length := by
+        rewrite [E]
+        apply Nat.lt_succ_of_le
+        assumption
+      have H2: i < ST.length := by
+        rewrite [<-Hlen]
+        exact H1
+      simp
+      rewrite [List.getElem?_append_left H1]
+      rewrite [List.getElem?_append_left H2]
+      simp [H1, H2]
+      specialize HST i H1
+      apply Store.weakening
+      . apply StoreTy.app_extends
+      . simp [H1, H2] at HST
+        assumption
+
+
+theorem split_and3 {A B C}: A -> B -> C -> A ∧ B ∧ C := by
+  intro a b c
+  solve_by_elim
+
+
+macro "split_and3": tactic => `(tactic| apply split_and3)
+
+
+theorem Tm.preservation {ST1: StoreTy} {t1 t2 T st1 st2}:
+  ty{ [] // ST1 |- [t1]: [T]} ->
+  ST1.well_typed st1 ->
+  step[[t1] / st1]->[[t2] / st2] ->
+  exists ST2: StoreTy,
+    ST2.Extends ST1 ∧
+    ty{ [] // ST2 |- [t2]: [T]} ∧
+    ST2.well_typed st2
+:= by
+  intro Ht
+  generalize E: [ctx| []] = G
+  rewrite [E] at Ht
+  induction Ht
+    generalizing t2
+  with (
+      rewrite [<-E]
+      intro HST Hstep
+      let ⟨Hlen, HST'⟩ := HST
+    )
+  | Var | Abs | Nat | Unit | Loc =>
+    contradiction
+  | App H1 H2 IH1 IH2 =>
+    rewrite [<-E] at H1 IH1
+    rewrite [<-E] at H2 IH2
+    cases Hstep with
+    | AppAbs =>
+      exists ST1
+      split_and3
+      . rfl
+      . cases H1
+        solve_by_elim [subst_preserves_typing]
+      . assumption
+    | App1 | App2 =>
+      try next Hstep =>
+      try let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH1 (Eq.refl _) HST Hstep
+      try let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH2 (Eq.refl _) HST Hstep
+      constructor
+      split_and3
+      . solve_by_elim [Relation.refl, Store.weakening, StoreTy.app_extends]
+      . (try assumption) <;>
+        constructor <;>
+        solve_by_elim [Store.weakening]
+      . solve_by_elim [Store.well_typed_app]
+  | Seq H1 H2 IH1 IH2
+  | Pred H1 IH1 | Succ H1 IH1 | Mult H1 H2 IH1 IH2
+  | If0 H1 H2 H3 IH1 IH2 IH3 =>
+    rewrite [<-E] at H1 IH1
+    try rewrite [<-E] at H2 IH2
+    try rewrite [<-E] at H3 IH3
+    cases Hstep <;>
+      try next Hstep =>
+      try let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH1 (Eq.refl _) HST Hstep
+      try let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH2 (Eq.refl _) HST Hstep
+      constructor <;> (
+        split_and3
+        . solve_by_elim [Relation.refl, Store.weakening, StoreTy.app_extends]
+        . (try assumption) <;>
+          constructor <;>
+          solve_by_elim [Store.weakening]
+        . solve_by_elim [Store.well_typed_app]
+      )
+  | Ref H1 IH1 =>
+    rewrite [<-E] at H1 IH1
+    cases Hstep with
+    | Ref =>
+      next Hstep =>
+      let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH1 (Eq.refl _) HST Hstep
+      constructor
+      split_and3 <;>
+        solve_by_elim [Relation.refl]
+    | RefValue =>
+      next t T Hval =>
+      exists ST1 ++ [T]
+      split_and3
+      . solve_by_elim [StoreTy.app_extends]
+      . rewrite [Hlen]
+        constructor
+        . simp
+        . simp
+      . solve_by_elim [Store.well_typed_app]
+  | Deref H1 IH1 =>
+    rewrite [<-E] at H1 IH1
+    cases Hstep with
+    | Deref =>
+      next Hstep =>
+      let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH1 (Eq.refl _) HST Hstep
+      constructor
+      split_and3 <;>
+        solve_by_elim [Relation.refl]
+    | DerefLoc =>
+      exists ST1
+      split_and3
+      . rel_refl
+      . cases H1
+        subst_eqs
+        solve_by_elim
+      . assumption
+  | Assign H1 H2 IH1 IH2 =>
+    next T =>
+    simp [<-E, HST] at H1 H2 IH1 IH2
+    cases Hstep with
+    | @Assign v i _ Hv Hi =>
+      cases H1
+      next HT =>
+      exists ST1
+      split_and3
+      . rel_refl
+      . constructor
+      . and_intros
+        . simp [Hlen]
+        . intro j Hj
+          cases Nat.decEq i j with
+          | isTrue E =>
+            rewrite [<-E]
+            rewrite [Store.relpace_eq]
+            . rewrite [<-HT]
+              exact H2
+            . assumption
+          | isFalse NE =>
+            rewrite [Store.replace_neq]
+            . simp at Hj
+              solve_by_elim
+            . simp
+              solve_by_elim
+    | Assign1 | Assign2 =>
+      next Hstep =>
+      try let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH1 Hstep
+      try let ⟨ST2, ⟨H1, ⟨H2, H3⟩⟩⟩ := IH2 Hstep
+      constructor
+      split_and3
+      . assumption
+      . constructor <;>
+        solve_by_elim [Store.weakening]
+      . assumption
+
+
+theorem Tm.progress {ST t T st}:
+  ty{ [] // ST |- [t]: [T]} ->
+  ST.well_typed st ->
+  (t.Value ∨ ∃ t' st', step[[t] / st]->[ [t'] / st' ])
+:= by
+  generalize E: [ctx| [] ] = Gamma
+  intro Ht HST
+  induction Ht with (
+    subst E
+  )
+  | Var =>
+    contradiction
+  | Nat | Unit | Loc | Abs  =>
+    left
+    constructor
+  | App H1 H2 IH1 IH2 =>
+    simp at *
+    right
+    cases IH1 with
+    | inl H =>
+      cases H <;> try contradiction
+      cases IH2 with
+      | inl =>
+        constructor <;> solve_by_elim
+      | inr H =>
+        let ⟨t', ⟨st', Hstep⟩⟩ := H
+        constructor; constructor
+        apply Tm.step.App2
+        . constructor
+        . exact Hstep
+    | inr =>
+      next H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
+  | Seq H1 H2 IH1 IH2 => -- should be the same as App
+    simp at *
+    right
+    cases IH1 with
+    | inl H =>
+      constructor; constructor
+      apply Tm.step.Seq2
+      exact H
+    | inr H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
+  | Succ H IH | Pred H IH =>
+    simp at *
+    right
+    cases IH with
+    | inl H =>
+      cases H <;> try contradiction
+      repeat constructor
+    | inr H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
+  | Mult H1 H2 IH1 IH2 =>
+    simp at *
+    right
+    cases IH1 with
+    | inl H =>
+      cases H <;> try contradiction
+      cases IH2 with
+      | inl H =>
+        cases H <;> try contradiction
+        constructor <;> solve_by_elim
+      | inr H =>
+        let ⟨t', ⟨st', Hstep⟩⟩ := H
+        constructor <;> solve_by_elim [Tm.step.Mult2]
+    | inr H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
+  | If0 Hc Ht Hf IHc IHt IHf =>
+    simp at *
+    right
+    cases IHc with
+    | inl H =>
+      cases H <;> try contradiction
+      next n =>
+      cases n with
+      | zero =>
+        constructor; constructor
+        apply Tm.step.If0Zero
+      | succ m =>
+        constructor; constructor
+        apply Tm.step.If0NonZero
+    | inr H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
+  | Ref H IH =>
+    simp at *
+    right
+    cases IH with
+    | inl H =>
+      cases H <;>
+        repeat constructor
+    | inr H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
+  | Deref H IH =>
+    simp at *
+    right
+    cases IH with
+    | inl H =>
+      cases H <;> try contradiction
+      cases H
+      constructor; constructor
+      apply Tm.step.DerefLoc
+      simp [HST.left]
+      assumption
+    | inr H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
+  | Assign H1 H2 IH1 IH2 =>
+    simp at *
+    right
+    cases IH1 with
+    | inl H =>
+      cases H <;> try contradiction
+      cases H1
+      cases IH2 with
+      | inl H =>
+        constructor; constructor
+        apply Tm.step.Assign
+        . exact H
+        . simp [HST.left]
+          assumption
+      | inr H =>
+        let ⟨t', ⟨st', Hstep⟩⟩ := H
+        constructor; constructor
+        apply Tm.step.Assign2
+        . constructor
+        . assumption
+    | inr H =>
+      let ⟨t', ⟨st', Hstep⟩⟩ := H
+      constructor <;> solve_by_elim
 
 end STLCRef

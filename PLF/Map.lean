@@ -119,9 +119,30 @@ theorem PartialMap.update_same {A : Type} {m : PartialMap A} {x} {v: A}:
   apply TotalMap.update_same
 
 
+theorem PartialMap.update_shadow {A: Type} {m : PartialMap A} {x v1 v2}:
+  map![x => v2 ; x => v1 ; m] = map![x => v2 ; m]
+:= by
+  apply TotalMap.update_shadow
+
+
+theorem PartialMap.update_permute {A: Type} {m : PartialMap A} {x1 x2 v1 v2}:
+  x1 ≠ x2 ->
+  map![x1 => v1 ; x2 => v2 ; m] =  map![x2 => v2 ; x1 => v1 ; m]
+:= by
+  apply TotalMap.update_permute
+
+
 @[simp]
 def PartialMap.included_in {A: Type} (m m': PartialMap A) :=
   forall x v, m x = .some v -> m' x = .some v
+
+
+@[refl]
+theorem PartialMap.included_in_refl {A} {m: PartialMap A}:
+  m.included_in m
+:= by
+  intro x v H
+  exact H
 
 
 theorem PartialMap.included_in_update {A: Type} {m m' : PartialMap A}
