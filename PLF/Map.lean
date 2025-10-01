@@ -109,6 +109,12 @@ theorem PartialMap.update_eq {A: Type} {m : PartialMap A} {x} {v: A}:
   apply TotalMap.update_eq
 
 
+theorem PartialMap.update_neq {A: Type} {m: TotalMap A} {x1 x2 v}:
+  x1 ≠ x2 -> map![x1 => v; m] x2 = m x2
+:= by
+  apply TotalMap.update_neq
+
+
 theorem PartialMap.update_same {A : Type} {m : PartialMap A} {x} {v: A}:
   m x = .some v ->
   map![x => v ; m] = m

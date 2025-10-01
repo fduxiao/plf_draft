@@ -11,4 +11,6 @@ import PLF.SmallStep
 import PLF.Types
 import PLF.Stlc
 import PLF.StlcProp
+import PLF.SyntaxCat
 import PLF.Ref
+import PLF.Norm

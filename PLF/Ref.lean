@@ -3,17 +3,10 @@ Mutable reference
 -/
 import PLF.Relation
 import PLF.Map
+import PLF.SyntaxCat
 
 
 namespace STLCRef
-
-declare_syntax_cat my_ident
-scoped syntax ident: my_ident
-scoped syntax "[" term "]": my_ident
-scoped syntax "[ident|" my_ident "]": term
-scoped macro_rules
-  | `([ident| $x:ident ]) => `($(Lean.quote (toString x.getId)))
-  | `([ident| [$x:term] ]) => `($x)
 
 inductive Ty where
   | Nat: Ty
