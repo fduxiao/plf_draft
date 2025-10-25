@@ -427,8 +427,9 @@ theorem tm.big_step.deterministic {t1 t2 t3: tm}:
       . eq_refl
       . eq_refl
     | inr H =>
-      apply H13.nvalue_refl
-      apply H
+      apply big_step.nvalue_refl
+      . exact H
+      . exact H13
   | IfTrue HT H2 IH IH2 =>
     cases H13 with
     | Value H =>
@@ -667,9 +668,10 @@ theorem tm.has_type.big_step_progress {t: tm} T:
         exact Hs
       . right
         constructor
-        apply V.n_canonical
+        apply value.n_canonical
         apply Ht.big_step_preservation
-        apply Hs
+        . exact Hs
+        . exact V
   | Pred Ht IH =>
     right
     cases IH with

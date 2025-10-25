@@ -787,16 +787,16 @@ theorem Tm.step.preserves_R {T: Ty} {t t': Tm}:
   | Bool =>
     simp at *
     and_intros
-    . apply Hstep.preservation
-      exact HR.left
+    . apply Tm.step.preservation
+      . exact HR.left
+      . exact Hstep
     . apply Hstep.preserves_halting.mp
       exact HR.right
   | Arrow T1 T2 IH1 IH2 =>
     simp at *
     let ⟨H1, ⟨H2, H3⟩⟩ := HR
     and_intros
-    . apply Hstep.preservation
-      assumption
+    . apply Tm.step.preservation <;> assumption
     . apply Hstep.preserves_halting.mp
       assumption
     . intro s H
@@ -808,8 +808,7 @@ theorem Tm.step.preserves_R {T: Ty} {t t': Tm}:
     simp at *
     let ⟨_, ⟨_, ⟨_, _⟩⟩⟩ := HR
     apply And.intro
-    . apply Hstep.preservation
-      assumption
+    . apply Tm.step.preservation <;> assumption
     apply And.intro
     . apply Hstep.preserves_halting.mp
       assumption
@@ -899,9 +898,8 @@ theorem Tm.mstep.preserves_R' {T t t'} :
     trivial
   | step Hab Hbc IHbc =>
     intro Ha
-    apply Hab.preserves_R'
-    . assumption
-    . solve_by_elim [Tm.step.preservation]
+    apply step.preserves_R'
+      <;> solve_by_elim [Tm.step.preservation]
 
 
 abbrev Env := List (Var × Tm)
@@ -1652,8 +1650,9 @@ theorem Tm.msubst_R_lemma {c: TyAsgmt} {env t T} {Gamma}:
       and_intros
       . rel_trans
         . apply Hstep1.pair1
-        apply Hstep2.pair2
-        exact Hv1
+        . apply mstep.pair2
+          . exact Hv1
+          . exact Hstep2
       . constructor
         . exact Hv1
         . exact Hv2
