@@ -155,9 +155,11 @@ class ClosureOp {A: Type} (Pred: outParam (RelationPred A)) (Cl: outParam (Relat
   least {P Q: Relation A} := (close P).least (P := P) (Q := Q)
 
 
-def RelationOp.close {A: Type}
+instance RelationOp.close {A: Type}
   (Cl: RelationOp A) (P: Relation A) {Pred: RelationPred A}
   [inst: ClosureOp Pred Cl]
+:
+  Closure Pred P (Cl P)
 := inst.close P
 
 
