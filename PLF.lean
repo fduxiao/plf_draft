@@ -14,3 +14,4 @@ import PLF.StlcProp
 import PLF.SyntaxCat
 import PLF.Ref
 import PLF.Norm
+import PLF.PartialEval
