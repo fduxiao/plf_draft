@@ -56,8 +56,8 @@ example:
   . apply Derivable.HAsgn
 
 
-def State.Assertion.implies.true_post {P}: P ->> True := fun _ _ => True.intro
-def State.Assertion.implies.false_pre {Q}: False ->> Q := fun _ f => f.elim
+theorem State.Assertion.implies.true_post {P}: P ->> True := fun _ _ => True.intro
+theorem State.Assertion.implies.false_pre {Q}: False ->> Q := fun _ f => f.elim
 
 def Derivable.true_post {c P}:
   Derivable P c True

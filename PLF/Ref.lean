@@ -1076,7 +1076,7 @@ theorem Tm.progress {ST t T st}:
     cases IH with
     | inl H =>
       cases H <;> try contradiction
-      repeat constructor
+      repeat constructor!
     | inr H =>
       let ⟨t', ⟨st', Hstep⟩⟩ := H
       constructor <;> solve_by_elim
@@ -1119,7 +1119,7 @@ theorem Tm.progress {ST t T st}:
     cases IH with
     | inl H =>
       cases H <;>
-        repeat constructor
+        repeat constructor!
     | inr H =>
       let ⟨t', ⟨st', Hstep⟩⟩ := H
       constructor <;> solve_by_elim

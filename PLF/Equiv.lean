@@ -588,10 +588,10 @@ where
   sound {a: A}: R a (t a)
 
 
-def Transformation.sound {A: Type} {t: Transformation A} {R: Relation A}
+theorem Transformation.sound {A: Type} {t: Transformation A} {R: Relation A}
   [inst: t.Sound R] {a: A}: R a (t a) := inst.sound
 
-def Relation.sound {A: Type} {t: Transformation A} {R: Relation A}
+theorem Relation.sound {A: Type} {t: Transformation A} {R: Relation A}
   [inst: t.Sound R] {a: A} : R a (t a) := inst.sound
 
 

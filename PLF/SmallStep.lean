@@ -67,7 +67,7 @@ theorem TM.step.deterministic {x y1 y2: TM}:
       solve_by_elim
 
 
-def TM.strongProgress (t: TM): t.value \/ exists t', t.step t'
+theorem TM.strongProgress (t: TM): t.value ∨ exists t', t.step t'
 := by
   induction t with
   | C n =>

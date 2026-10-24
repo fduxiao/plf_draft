@@ -257,11 +257,11 @@ theorem tm.has_type.progress {t: tm} T:
       cases V with
       | zero =>
         constructor
-        . constructor
+        . apply step.Pred0
       | succ =>
         let V := V.n_canonical Ht
         constructor
-        . constructor
+        . apply step.PredSucc
           cases V
           . assumption
     | inr H =>
@@ -277,11 +277,11 @@ theorem tm.has_type.progress {t: tm} T:
       cases V with
       | zero =>
         constructor
-        . constructor
+        . apply step.Iszero0
       | succ =>
         let V := V.n_canonical Ht
         constructor
-        . constructor
+        . apply step.IszeroSucc
           cases V
           . assumption
     | inr H =>

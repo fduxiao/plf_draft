@@ -1089,7 +1089,7 @@ def Env.closed: Env -> Prop
   | (_x, t) :: env' => t.closed ∧ Env.closed env'
 
 
-def Tm.subst_msubst {env: Env} {x} {v t: Tm}:
+theorem Tm.subst_msubst {env: Env} {x} {v t: Tm}:
   v.closed ->
   env.closed ->
   env.msubst (t.subst x v) = ((env.dropKey x).msubst t).subst x v
@@ -1619,7 +1619,7 @@ theorem Tm.msubst_R_lemma {c: TyAsgmt} {env t T} {Gamma}:
         . apply mstep.if1
           exact step_c'
         . rtcl_incl
-          constructor
+          first | apply step.ifTrue | apply step.ifFalse
       . assumption
   | fst Ht IH | snd Ht IH =>
     try rewrite [msubst_fst]

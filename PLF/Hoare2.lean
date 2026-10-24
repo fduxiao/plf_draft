@@ -221,7 +221,7 @@ def Decorated.verifcation_conds (dec: Decorated): Prop :=
   dec.dimp.verifcation_conds dec.pre_cond
 
 
-def Decorated.verifcation_conds_correct {dec: Decorated} :
+theorem Decorated.verifcation_conds_correct {dec: Decorated} :
   dec.verifcation_conds -> dec.outer_triple_valid
 := dec.dimp.verifcation_conds_correct _
 

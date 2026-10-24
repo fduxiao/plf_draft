@@ -4,7 +4,7 @@ abbrev Relation (A: Type) := A -> A -> Prop
 class Reflexive {A} (P: Relation A) where
   refl: forall {a: A}, P a a
 
-def Relation.refl {A: Type} {P: Relation A} [inst: Reflexive P]:
+theorem Relation.refl {A: Type} {P: Relation A} [inst: Reflexive P]:
   forall {a: A}, P a a := inst.refl
 
 macro "rel_refl": tactic => `(tactic| apply Relation.refl)
@@ -12,21 +12,21 @@ macro "rel_refl": tactic => `(tactic| apply Relation.refl)
 class Irreflexive {A} (P: Relation A) where
   irrefl: forall {a: A}, Not (P a a)
 
-def Relation.irrefl {A: Type} {P: Relation A} [inst: Irreflexive P]:
+theorem Relation.irrefl {A: Type} {P: Relation A} [inst: Irreflexive P]:
   forall {a: A}, Not (P a a) := inst.irrefl
 
 
 class Antisymmetric {A} (P: Relation A) where
   anti: forall {a b: A}, P a b -> P b a -> a = b
 
-def Relation.anti {A} {P: Relation A} [inst: Antisymmetric P]:
+theorem Relation.anti {A} {P: Relation A} [inst: Antisymmetric P]:
   forall {a b: A}, P a b -> P b a -> a = b := inst.anti
 
 
 class Transitive {A} (P: Relation A) where
   trans: forall {a b c: A}, P a b -> P b c -> P a c
 
-def Relation.trans {A: Type} {P: Relation A} [inst: Transitive P]:
+theorem Relation.trans {A: Type} {P: Relation A} [inst: Transitive P]:
   forall {a b c: A}, P a b -> P b c -> P a c := inst.trans
 
 
@@ -35,7 +35,7 @@ macro "rel_trans": tactic => `(tactic| apply Relation.trans)
 class Symmetric {A} (P: Relation A) where
   symm: forall {a b: A}, P a b -> P b a
 
-def Relation.symm {A} {P: Relation A} [inst: Symmetric P]:
+theorem Relation.symm {A} {P: Relation A} [inst: Symmetric P]:
   forall {a b: A}, P a b -> P b a := inst.symm
 
 class Congruence {A: Type} (P: Relation A) (S: A -> A) where
@@ -48,7 +48,7 @@ class KeepCong {A: Type} (P Q: Relation A) where
     forall {a b}, (Q a b) -> Q (f a) (f b)
 
 
-def Relation.keep_cong {A: Type}
+theorem Relation.keep_cong {A: Type}
   {P Q: Relation A} (f: A -> A)
   [inst: KeepCong P Q]:
     (forall {a b}, (P a b) -> P (f a) (f b)) ->
@@ -61,7 +61,7 @@ class SubRel {A} (P: Relation A) (Q: Relation A): Prop where
 
 notation: 60 P " sub_rel " Q => SubRel P Q
 
-def Relation.super {A: Type} {P: Relation A} {Super: Relation A}
+theorem Relation.super {A: Type} {P: Relation A} {Super: Relation A}
   [inst: P sub_rel Super]: forall {a b: A}, P a b -> Super a b
 :=
   inst.inclusion
@@ -363,7 +363,7 @@ Normal terms with respect to multi step reduction
 def Relation.MNormal {A: Type} (R: Relation A) (x: A) := forall {y}, RTCl R x y -> x = y
 
 
-def Relation.Normal.MNormal {A: Type} {R: Relation A}:
+theorem Relation.Normal.MNormal {A: Type} {R: Relation A}:
   forall {x: A}, R.Normal x -> R.MNormal x
 := by
   intros n HR m HMR
@@ -400,8 +400,11 @@ class SemiConfluent {A: Type} (P: Relation A) where
   semi_confl: forall {m1 m2 m3: A}, P m1 m2 -> RTCl P m1 m3 -> exists m4, RTCl P m2 m4 /\ RTCl P m3 m4
 
 
-def Relation.semi_confl {A: Type} (P: Relation A) [inst: SemiConfluent P]
-  {m1 m2 m3: A} := inst.semi_confl (m1 := m1) (m2 := m2) (m3 := m3)
+theorem Relation.semi_confl {A: Type} (P: Relation A) [inst: SemiConfluent P]
+  {m1 m2 m3: A}
+:
+  P m1 m2 → RTCl P m1 m3 → ∃ m4, RTCl P m2 m4 ∧ RTCl P m3 m4
+:= inst.semi_confl (m1 := m1) (m2 := m2) (m3 := m3)
 
 
 class Confluent {A: Type} (P: Relation A) where
@@ -409,16 +412,22 @@ class Confluent {A: Type} (P: Relation A) where
     RTCl P m1 m2 -> RTCl P m1 m3 -> exists m4, RTCl P m2 m4 /\ RTCl P m3 m4
 
 
-def Relation.confl {A: Type} (P: Relation A) [inst: Confluent P]
-  {m1 m2 m3: A} := inst.confl (m1 := m1) (m2 := m2) (m3 := m3)
+theorem Relation.confl {A: Type} (P: Relation A) [inst: Confluent P]
+  {m1 m2 m3: A}
+:
+  RTCl P m1 m2 → RTCl P m1 m3 → ∃ m4, RTCl P m2 m4 ∧ RTCl P m3 m4
+:= inst.confl (m1 := m1) (m2 := m2) (m3 := m3)
 
 
 class ChurchRosser {A: Type} (P: Relation A) where
   church_rosser: forall {m2 m3: A},
     ECl P m2 m3 -> exists m4, RTCl P m2 m4 /\ RTCl P m3 m4
 
-def Relation.church_rosser {A: Type} (P: Relation A) [inst: ChurchRosser P]
-  {m2 m3: A} := inst.church_rosser (m2 := m2) (m3 := m3)
+theorem Relation.church_rosser {A: Type} (P: Relation A) [inst: ChurchRosser P]
+  {m2 m3: A}
+:
+  ECl P m2 m3 → ∃ m4, RTCl P m2 m4 ∧ RTCl P m3 m4
+:= inst.church_rosser (m2 := m2) (m3 := m3)
 
 
 instance Relation.semi_confl_to_confl {A: Type} (P: Relation A)
