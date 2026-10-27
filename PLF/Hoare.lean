@@ -1,4 +1,4 @@
-import PLF.Equiv
+import PLF.Imp
 
 
 -- This is used to forces type casting
@@ -59,46 +59,42 @@ syntax "(" lfp_assertion_aexp ")" : lfp_assertion_aexp
 -- application
 syntax:30 lfp_assertion_aexp:30 lfp_assertion_aexp:31 : lfp_assertion_aexp
 -- evaluation
-syntax "[AAE|" lfp_assertion_aexp "]": term
+syntax "[Eval|" lfp_assertion_aexp "]": term
 
 
--- Evaluation each [AAE| ... ] to fun st => some Nat
+-- Evaluation each [Eval| ... ] to fun st => some Nat
 macro_rules
-  | `([AAE| $x:num]) => `(fun _ => $x)
-  | `([AAE| $x:ident]) => `(fun st => st $(Lean.quote (toString x.getId)))
-  | `([AAE| $x + $y]) => `(fun st => (st.eval_any [AAE|$x]) + (st.eval_any [AAE|$y]))
-  | `([AAE| $x - $y]) => `(fun st => (st.eval_any [AAE|$x]) - (st.eval_any [AAE|$y]))
-  | `([AAE| $x * $y]) => `(fun st => (st.eval_any [AAE|$x]) * (st.eval_any [AAE|$y]))
-  | `([AAE| [A| $e ] ]) => `(fun st => st.eval_any [AExp| $e])
-  | `([AAE| [$x] ]) => `(fun st => st.eval_any $x)
-  | `([AAE| #[ $x ] ]) => `(fun _ => $x)
-  | `([AAE| ($x) ]) => `([AAE| $x ])
-  | `([AAE| $x $y ]) => `(fun st => (st.eval_any [AAE| $x ]) (st.eval_any [AAE| $y ]))
+  | `([Eval| $x:num]) => `(fun _ => $x)
+  | `([Eval| $x:ident]) => `(fun st => st $(Lean.quote (toString x.getId)))
+  | `([Eval| $x + $y]) => `(fun st => (st.eval_any [Eval|$x]) + (st.eval_any [Eval|$y]))
+  | `([Eval| $x - $y]) => `(fun st => (st.eval_any [Eval|$x]) - (st.eval_any [Eval|$y]))
+  | `([Eval| $x * $y]) => `(fun st => (st.eval_any [Eval|$x]) * (st.eval_any [Eval|$y]))
+  | `([Eval| [A| $e ] ]) => `(fun st => st.eval_any [AExp| $e])
+  | `([Eval| [$x] ]) => `(fun st => st.eval_any $x)
+  | `([Eval| #[ $x ] ]) => `(fun _ => $x)
+  | `([Eval| ($x) ]) => `([Eval| $x ])
+  | `([Eval| $x $y ]) => `(fun st => (st.eval_any [Eval| $x ]) (st.eval_any [Eval| $y ]))
 
 
 namespace Playground
 def test_state := state![X => 1;Y => 2]
+def some_eval := fun st: State => st.aeval ("X") + 3
 
-example: test_state.eval_any [AAE| 3 ] = 3 := by
-  eq_refl
+example: some_eval test_state = 4 := rfl
+example: [Eval| X + 3 ] test_state = 4 := rfl
+example: [Eval| 3 ] test_state = 3 := rfl
+example: [Eval| X ] test_state = 1 := rfl
 
-example: test_state.eval_any [AAE| X ] = 1 := by
-  eq_refl
+example: [Eval| [some_eval]] = some_eval := rfl
+example: [Eval| [some_eval]] test_state = 4 := rfl
 
-example: test_state.eval_any [AAE| [Y] ] = 2 := by
-  eq_refl
+example: [Eval| [Y] ] test_state = 2 := rfl
+example: [Eval| [A|X + 2] ] test_state = 3 := rfl
 
-example: test_state.eval_any [AAE| [A|X + 2] ] = 3 := by
-  eq_refl
-
-example: test_state.eval_any [AAE| 6 * #[3] + 1 ] = 19 := by
-  eq_refl
-
-example: test_state.eval_any [AAE| #[Nat.succ] 1 ] = 2 := by
-  eq_refl
-
-example: test_state.eval_any [AAE| #[Nat.add] 1 2 ] = 3 := by
-  eq_refl
+example: [Eval| 6 * #[3] + 1 ] test_state = 19 := rfl
+example: [Eval| #[Nat.succ] 1 ] test_state = 2 := rfl
+example: [Eval| #[Nat.add] 1 2 ] test_state = 3 := rfl
+example: [Eval| #[Nat.add] [some_eval] 2 ] test_state = 6 := rfl
 
 end Playground
 
@@ -136,15 +132,15 @@ syntax "{{" lfp_assertion "}}": term
 macro_rules
   -- arithmetic
   | `({{ $x:lfp_assertion_aexp = $y }}) =>
-    `(fun (st: State) => st.eval_any [AAE|$x] = st.eval_any [AAE|$y])
+    `(fun (st: State) => st.eval_any [Eval|$x] = st.eval_any [Eval|$y])
   | `({{ $x:lfp_assertion_aexp < $y }}) =>
-    `(fun (st: State) => st.eval_any [AAE|$x] < st.eval_any [AAE|$y])
+    `(fun (st: State) => st.eval_any [Eval|$x] < st.eval_any [Eval|$y])
   | `({{ $x:lfp_assertion_aexp <= $y }}) =>
-    `(fun (st: State) => st.eval_any [AAE|$x] <= st.eval_any [AAE|$y])
+    `(fun (st: State) => st.eval_any [Eval|$x] <= st.eval_any [Eval|$y])
   | `({{ $x:lfp_assertion_aexp > $y }}) =>
-    `(fun (st: State) => st.eval_any [AAE|$x] > st.eval_any [AAE|$y])
+    `(fun (st: State) => st.eval_any [Eval|$x] > st.eval_any [Eval|$y])
   | `({{ $x:lfp_assertion_aexp >= $y }}) =>
-    `(fun (st: State) => st.eval_any [AAE|$x] >= st.eval_any [AAE|$y])
+    `(fun (st: State) => st.eval_any [Eval|$x] >= st.eval_any [Eval|$y])
   -- logic
   | `({{ ~$x }}) => `(fun (st: State) => Not (st.eval_any {{$x}}))
   | `({{ ¬$x }}) => `(fun (st: State) => Not (st.eval_any {{$x}}))
@@ -162,22 +158,57 @@ macro_rules
 
 namespace Playground
 
-example: State.Assertion := {{ [B| X == 3] }}
-example: State.Assertion := {{ [fun _ => True] }}
-example: State.Assertion := {{ [False] }}
+example:
+  {{ 2 <= 3 }} = fun st => [Eval| 2] st <= [Eval| 3] st
+:= rfl
 
-example: State.Assertion := {{ [True \/ False] }}
+example:
+  {{ X = 3 ∨ X <= Y }} =
+    fun st =>
+      [Eval| X] st = [Eval| 3] st
+      ∨
+      [Eval| X] st <= [Eval| Y] st
+:= rfl
 
-example: State.Assertion := {{ X <= [Y] }}
-example: State.Assertion := {{ 2 <= 3 }}
+example:
+  {{ ~ X = 2 }} = fun st => ¬ (st.eval_any [Eval| X] = st.eval_any [Eval| 2])
+:= rfl
 
-example: State.Assertion := {{ X = 3 \/ X <= Y }}
-example: State.Assertion := {{ Z = #[max] X Y }}
+example:
+  {{ [B| X == 3] }} = fun st => st.beval [BExp| X == 3] = true
+:= rfl
 
-example: State.Assertion := {{ ~[True] }}
-example: State.Assertion := {{ ~ X = 2 }}
+example:
+  {{ [fun _ => True] }} = fun _: State => True
+:= rfl
 
-example: State.Assertion := {{ (Z * Z <= X) /\ ~(#[Nat.succ] 1 <= X) }}
+example:
+  {{ [False] }} = fun _: State => False
+:= rfl
+
+example:
+  {{ [True ∨ False] }} = fun _: State => True ∨ False
+:= rfl
+
+example:
+  {{ X <= [Y] }} = fun st => [Eval| X] st <= [Eval| [Y]] st
+:= rfl
+
+example:
+  {{ Z = #[max] X Y }} =
+    fun st =>
+      [Eval| Z] st = [Eval| #[max] X Y] st
+:= rfl
+
+example: {{ ~[True] }} = fun st => Not ([Eval| [True]] st) := rfl
+
+example:
+  {{ (Z * Z <= X) ∧ ~(#[Nat.succ] 1 <= X) }} =
+    fun st =>
+      [Eval| Z * Z] st <= [Eval| X] st
+      ∧
+      Not ([Eval| #[Nat.succ] 1] st <= [Eval| X] st)
+:= rfl
 
 example: State.Assertion := {{ #[Nat.add] X Y > #[max] Y X }}
 
