@@ -347,8 +347,7 @@ theorem Imp.assign_aequiv {x: String} {a}:
       rewrite [E] at Hx
       rewrite [<-Hx]
       let E := st1.update_same (x := x)
-      unfold State.update
-      rewrite [E]
+      rw [E]
       apply BigStep.Skip
 
 
@@ -938,9 +937,7 @@ theorem AExp.subst.inequiv: Not AExp.subst.equiv_property := by
       specialize (K H2)
       unfold Y st2 st3 a2 at K
       simp at K
-      have E: 1 = if X = "X" then 1 else 0 := by
-        eq_refl
-      rewrite [<-E] at K
+      rw [State.update_eq] at K
       contradiction
 
 end UnsuitableSubst

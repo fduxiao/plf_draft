@@ -1,27 +1,27 @@
 import PLF.Hoare
 
 
-inductive Derivable : State.Assertion -> Imp -> State.Assertion -> Type where
+inductive Derivable : Assertion -> Imp -> Assertion -> Prop where
   | HSkip {P}: Derivable P <{skip}> P
   | HAsgn {Q V a}:
       Derivable ({{Q ![ [V] => [a]]}}) <{[V] := [a]}> Q
   | HSeq {P c Q d R}:
       Derivable Q d R -> Derivable P c Q -> Derivable P <{ c; d }> R
   | HIf {P Q} {b: BExp} {c1 c2}:
-    Derivable {{ P /\ b }} c1 Q ->
-    Derivable {{ P /\ ~b }} c2 Q ->
+    Derivable {{ P ∧  b }} c1 Q ->
+    Derivable {{ P ∧ ¬b }} c2 Q ->
     Derivable P <{if b then c1 else c2 end}> Q
   | HWhile {P} {b: BExp} {c}:
-    Derivable {{ P /\ b }} c P ->
-    Derivable P <{while b do c end}> {{ P /\ ~b}}
-  | HConsequence {P1 Q1 P2 Q2 : State.Assertion} {c}:
+    Derivable {{ P ∧ b }} c P ->
+    Derivable P <{while b do c end}> {{ P ∧ ¬b}}
+  | HConsequence {P1 Q1 P2 Q2 : Assertion} {c}:
     Derivable P2 c Q2 ->
     (P1 ->> P2) ->
     (Q2 ->> Q1) ->
     Derivable P1 c Q1
 
 
-def Derivable.HConsequencePre {P1 P2 Q : State.Assertion} {c}:
+theorem Derivable.HConsequencePre {P1 P2 Q : Assertion} {c}:
   Derivable P2 c Q ->
   (P1 ->> P2) ->
   Derivable P1 c Q
@@ -33,7 +33,7 @@ def Derivable.HConsequencePre {P1 P2 Q : State.Assertion} {c}:
   . simp
 
 
-def Derivable.HConsequencePost {P Q1 Q2: State.Assertion} {c}:
+theorem Derivable.HConsequencePost {P Q1 Q2: Assertion} {c}:
   Derivable P c Q2 ->
   (Q2 ->> Q1) ->
   Derivable P c Q1
@@ -47,19 +47,19 @@ def Derivable.HConsequencePost {P Q1 Q2: State.Assertion} {c}:
 
 example:
   Derivable
-    {{ X = 3 ![X => X + 2] ![X => X + 1] }}
+    {{ X == 3 ![X => X + 2] ![X => X + 1] }}
     <{ X := X + 1; X := X + 2}>
-    {{ X = 3 }}
+    {{ X == 3 }}
 := by
   apply Derivable.HSeq
   . apply Derivable.HAsgn
   . apply Derivable.HAsgn
 
 
-theorem State.Assertion.implies.true_post {P}: P ->> True := fun _ _ => True.intro
-theorem State.Assertion.implies.false_pre {Q}: False ->> Q := fun _ f => f.elim
+theorem Assertion.implies.true_post {P}: P ->> True := fun _ _ => True.intro
+theorem Assertion.implies.false_pre {Q}: False ->> Q := fun _ f => f.elim
 
-def Derivable.true_post {c P}:
+theorem Derivable.true_post {c P}:
   Derivable P c True
 := match c with
   | .Skip => .HConsequencePre .HSkip .true_post
@@ -69,7 +69,7 @@ def Derivable.true_post {c P}:
   | .While _ _ => .HConsequence (.HWhile .true_post) .true_post .true_post
 
 
-def Derivable.false_pre {c Q}:
+theorem Derivable.false_pre {c Q}:
   Derivable False c Q
 := match c with
   | .Skip => .HConsequencePre .HSkip .false_pre
@@ -86,7 +86,7 @@ def Derivable.false_pre {c Q}:
     . apply Derivable.HWhile (P := False)
       simp
       apply Derivable.false_pre
-    . apply State.Assertion.implies.false_pre
+    . apply Assertion.implies.false_pre
     . simp
 
 
@@ -117,7 +117,7 @@ theorem Derivable.sound {P c Q}:
     . apply HQ
 
 
-def Imp.wp (c:Imp) (Q: State.Assertion) : State.Assertion :=
+def Imp.wp (c:Imp) (Q: Assertion) : Assertion :=
   fun st1 => forall st2, st1 =[ c ]=> st2 -> Q st2
 
 
@@ -128,7 +128,7 @@ theorem Imp.wp.is_precondition {c: Imp} {Q}:
   solve_by_elim
 
 
-theorem Imp.wp.is_weakest {c: Imp} {Q P: State.Assertion}:
+theorem Imp.wp.is_weakest {c: Imp} {Q P: Assertion}:
   {{ P }}< c >{{ Q }} ->
   (P ->> (c.wp Q))
 := by
@@ -138,7 +138,7 @@ theorem Imp.wp.is_weakest {c: Imp} {Q P: State.Assertion}:
   solve_by_elim
 
 
-def Imp.wp.seq {P Q} {c1 c2: Imp}:
+theorem Imp.wp.seq {P Q} {c1 c2: Imp}:
   Derivable P c1 (c2.wp Q) ->
   Derivable (wp c2 Q) c2 Q ->
   Derivable P <{c1; c2}> Q
@@ -146,7 +146,7 @@ def Imp.wp.seq {P Q} {c1 c2: Imp}:
 
 
 theorem Imp.wp.invariant b (c: Imp) (Q):
-  {{ [ <{while b do c end}>.wp Q ] /\ b }}< c >{{ [<{while b do c end}>.wp Q]}}
+  {{ [ <{while b do c end}>.wp Q ] ∧ b }}< c >{{ [<{while b do c end}>.wp Q]}}
 := by
   apply HoareTriple.consequence_pre
   . apply is_precondition
@@ -167,7 +167,7 @@ theorem Imp.wp.invariant b (c: Imp) (Q):
         . apply BW
 
 
-def Imp.complete_aux c: forall P Q,
+theorem Imp.complete_aux c: forall P Q,
   {{ P }}< c >{{ Q }} -> Derivable P c Q
 := match c with
   | .Skip => by
@@ -233,6 +233,6 @@ def Imp.complete_aux c: forall P Q,
       apply HB
 
 
-def HoareTriple.complete {P c Q}:
+theorem HoareTriple.complete {P c Q}:
   {{ P }}< c >{{ Q }} -> Derivable P c Q
 := Imp.complete_aux c P Q

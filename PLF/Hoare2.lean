@@ -1,18 +1,19 @@
 import PLF.Hoare
 
+@[grind]
 inductive DImp : Type where
-  | Skip (Q: State.Assertion)
+  | Skip (Q: Assertion)
   | Seq (d1 d2: DImp)
-  | Asgn (X: String) (a: AExp) (Q: State.Assertion)
-  | If (b: BExp) (P1: State.Assertion) (d1: DImp)
-    (P2: State.Assertion) (d2: DImp) (Q: State.Assertion)
-  | While (b: BExp) (P: State.Assertion) (d: DImp) (Q: State.Assertion)
-  | Pre (P: State.Assertion) (d: DImp)
-  | Post (d: DImp) (Q: State.Assertion)
+  | Asgn (X: String) (a: AExp) (Q: Assertion)
+  | If (b: BExp) (P1: Assertion) (d1: DImp)
+    (P2: Assertion) (d2: DImp) (Q: Assertion)
+  | While (b: BExp) (P: Assertion) (d: DImp) (Q: Assertion)
+  | Pre (P: Assertion) (d: DImp)
+  | Post (d: DImp) (Q: Assertion)
 
-
+@[grind]
 structure Decorated : Type where
-  pre_cond: State.Assertion
+  pre_cond: Assertion
   dimp: DImp
 
 
@@ -78,15 +79,15 @@ def dec_while: Decorated :=
   <d{
   {{ True }}
     while ~X == 0
-    do {{ True ∧ ~X = 0 }}
+    do {{ True ∧ ¬ X == 0 }}
       X := X - 1 {{ True }}
     end
-  {{ True ∧ X = 0}} ->>
-  {{ X = 0 }}
+  {{ True ∧ X == 0}} ->>
+  {{ X == 0 }}
   }>
 
 
-@[simp]
+@[simp, grind]
 def DImp.erase (d: DImp): Imp :=
   match d with
   | .Skip _ => .Skip
@@ -98,8 +99,8 @@ def DImp.erase (d: DImp): Imp :=
   | .Post d _ => d.erase
 
 
-@[simp]
-def DImp.post_cond (d: DImp): State.Assertion :=
+@[simp, grind]
+def DImp.post_cond (d: DImp): Assertion :=
   match d with
   | .Skip Q => Q
   | .Asgn _ _ Q => Q
@@ -111,14 +112,14 @@ def DImp.post_cond (d: DImp): State.Assertion :=
 
 
 abbrev Decorated.erase (d: Decorated): Imp := d.dimp.erase
-abbrev Decorated.post_cond (d: Decorated): State.Assertion := d.dimp.post_cond
+abbrev Decorated.post_cond (d: Decorated): Assertion := d.dimp.post_cond
 
 
 example : dec_while.erase = <{while ~X == 0 do X := X - 1 end}> := by
   eq_refl
 
 example : dec_while.pre_cond = True := by eq_refl
-example : dec_while.post_cond = {{ X = 0 }} := by eq_refl
+example : dec_while.post_cond = {{ X == 0 }} := by eq_refl
 
 
 @[simp]
@@ -129,20 +130,20 @@ def Decorated.outer_triple_valid (d: Decorated) :=
 example: dec_while.outer_triple_valid =
   {{ True }}<
     while ~X == 0 do X := X - 1 end
-  >{{ X = 0 }}
+  >{{ X == 0 }}
 := by
   eq_refl
 
 
-@[simp]
-def DImp.verifcation_conds (P: State.Assertion) (d: DImp): Prop :=
+@[simp, grind]
+def DImp.verifcation_conds (P: Assertion) (d: DImp): Prop :=
   match d with
   | .Skip Q => P ->> Q
   | .Seq d1 d2 => d1.verifcation_conds P ∧ d2.verifcation_conds d1.post_cond
   | .Asgn x a Q => P ->> {{ Q ![[x] => [a]] }}
   | .If b P1 d1 P2 d2 Q =>
     ({{ P ∧ b }} ->> P1)
-    ∧ ({{ P ∧ ~b }} ->> P2)
+    ∧ ({{ P ∧ ¬ b }} ->> P2)
     ∧ (d1.post_cond ->> Q) ∧ (d2.post_cond ->> Q)
     ∧ d1.verifcation_conds P1
     ∧ d2.verifcation_conds P2
@@ -160,6 +161,7 @@ def DImp.verifcation_conds (P: State.Assertion) (d: DImp): Prop :=
     ∧ (d.post_cond ->> Q)
 
 
+@[grind .]
 theorem DImp.verifcation_conds_correct (d: DImp) P:
   d.verifcation_conds P -> {{ P }}< d.erase >{{ [d.post_cond] }}
 := by
@@ -216,32 +218,30 @@ theorem DImp.verifcation_conds_correct (d: DImp) P:
     apply HoareTriple.consequence_post <;> solve_by_elim
 
 
-@[simp]
+@[simp, grind]
 def Decorated.verifcation_conds (dec: Decorated): Prop :=
   dec.dimp.verifcation_conds dec.pre_cond
 
-
+@[grind .]
 theorem Decorated.verifcation_conds_correct {dec: Decorated} :
   dec.verifcation_conds -> dec.outer_triple_valid
 := dec.dimp.verifcation_conds_correct _
 
 
 macro "verify_one_assn": tactic => `(tactic|
-  (try simp at *) <;>
-  subst_vars <;>
-  (try simp at *) <;>
-  (try rewrite [
+  (try simp_all) <;>
+  (try simp_all [
     Nat.eq_of_beq,
     Nat.beq_eq_true_eq,
-    Nat.eq_of_beq_eq_true
-  ] at *) <;>
-  (try eq_refl) <;>
+    Nat.eq_of_beq_eq_true,
+    Nat.ne_of_beq_eq_false
+  ]) <;>
+  (try rfl) <;>
   (try intros <;>
     (try constructor) <;>
-    (try omega) <;>
-    solve_by_elim [
-    Nat.ne_of_beq_eq_false
-  ])
+    (try lia) <;>
+    grind [Nat.ne_of_beq_eq_false]
+  )
 )
 
 macro "verify_assn": tactic => `(tactic|
@@ -274,13 +274,13 @@ namespace Playground
 
 def swap_dec (m n:Nat) : Decorated :=
   <d{
-    {{ X = [m] ∧ Y = [n]}} ->>
-        {{ (X + Y) - ((X + Y) - Y) = [n] ∧ (X + Y) - Y = [m] }}
+    {{ X == [m] ∧ Y == [n]}} ->>
+        {{ (X + Y) - ((X + Y) - Y) == [n] ∧ (X + Y) - Y == [m] }}
     X := X + Y
-        {{ X - (X - Y) = [n] ∧ X - Y = [m] }};
+        {{ X - (X - Y) == [n] ∧ X - Y == [m] }};
     Y := X - Y
-        {{ X - Y = [n] ∧ Y = [m] }};
-    X := X - Y {{ X = [n] ∧ Y = [m]}}
+        {{ X - Y == [n] ∧ Y == [m] }};
+    X := X - Y {{ X == [n] ∧ Y == [m]}}
   }>
 
 
@@ -296,14 +296,14 @@ def if_minus_plus_dec :=
               {{ X <= Y }} (->>
               {{ X <= Y }}
     Z := Y - X
-              {{ Z = Y - X ∧ Y - X + X = Y }})
+              {{ Z == Y - X ∧ Y - X + X == Y }})
   else
               {{ True }} (->>
               {{ True }}
     Y := X + Z
-              {{ Y = X + Z }})
+              {{ Y == X + Z }})
   end
-  {{ Y = X + Z}} }>
+  {{ Y == X + Z}} }>
 
 theorem if_minus_plus_correct :
   if_minus_plus_dec.outer_triple_valid
@@ -316,61 +316,49 @@ def div_mod_dec (a b : Nat) : Decorated :=
   {{ True }} ->>
   {{ True }}
     X := [a]
-              {{ X = [a] }};
+              {{ X == [a] }};
     Y := 0
-              {{ X = [a] /\ Y = 0 }};
+              {{ X == [a] ∧ Y == 0 }};
     while [b] <= X do
-              {{ [a] = [b] * Y + X /\ [b] <= X}} ->>
-              {{ [a] = [b] * Y + X /\ [b] <= X }}
+              {{ [a] == [b] * Y + X ∧ [b] <= X}} ->>
+              {{ [a] == [b] * Y + X ∧ [b] <= X }}
       X := X - [b]
-              {{ [a] = [b] * Y + X + [b] }};
+              {{ [a] == [b] * Y + X + [b] }};
       Y := Y + 1
-              {{ [a] = [b] * Y + X }}
+              {{ [a] == [b] * Y + X }}
     end
-  {{ [a] = [b] * Y + X /\ X < [b] }} ->>
-  {{ [a] = [b] * Y + X /\ X < [b] }} }>
+  {{ [a] == [b] * Y + X ∧ X < [b] }} ->>
+  {{ [a] == [b] * Y + X ∧ X < [b] }} }>
 
 theorem div_mod_outer_triple_valid a b:
   (div_mod_dec a b).outer_triple_valid
 := by
   verify
-  . intros st E1 E2
-    rewrite [E1, E2]
-    omega
-  . verify_assn
-    intros st E
-    {calc
-      a = b * st "Y" + st "X" + b := E
-      _ = b * st "Y" + b + st "X" := by omega
-      _ = b * st "Y" + b * 1 + st "X" := by omega
-      _ = b * (st "Y" + 1) + st "X" := by
-        rewrite [Nat.mul_add]
-        eq_refl
-    }
 
 
 def slow_assignment_dec (m : Nat) : Decorated :=
   <d{
-    {{ X = [m] }}
+    {{ X == [m] }}
       Y := 0
-                    {{ Y = 0 /\ X = [m] }} ->>
-                    {{ X + Y = [m] /\ X = [m]  }} ;
+                    {{ Y == 0 ∧ X == [m] }} ->>
+                    {{ X + Y == [m] ∧ X == [m]  }} ;
       while ~X == 0 do
-                    {{ X + Y = [m] /\ ~X = 0  }} ->>
-                    {{ X + Y = [m] ![Y => Y + 1] ![X => X - 1] }}
+                    {{ X + Y == [m] ∧ ¬ X == 0  }} ->>
+                    {{ X + Y == [m] ![Y => Y + 1] ![X => X - 1] }}
         X := X - 1
-                    {{ X + Y = [m] ![Y => Y + 1] }} ;
+                    {{ X + Y == [m] ![Y => Y + 1] }} ;
         Y := Y + 1
-                    {{ X + Y = [m] }}
+                    {{ X + Y == [m] }}
       end
-    {{ X + Y = [m] /\ X = 0 }} ->>
-    {{ Y = [m] }}
+    {{ X + Y == [m] ∧ X == 0 }} ->>
+    {{ Y == [m] }}
   }>
 
 
 theorem slow_assignment m :
   (slow_assignment_dec m).outer_triple_valid
 := by
+  unfold slow_assignment_dec
   verify
 
 
@@ -417,16 +405,16 @@ theorem parity_lt_2 : ∀ x,
 
 def parity_dec (m: Nat) : Decorated :=
   <d{
-  {{ X = [m] }} ->>
-  {{ #[parity] X = #[parity m] }}
+  {{ X == [m] }} ->>
+  {{ #[parity] X == #[parity m] }}
     while 2 <= X do
-                  {{ #[parity] X = #[parity m] /\ 2 <= X }} ->>
-                  {{ #[parity] X = #[parity m] ![ X => X - 2] }}
+                  {{ #[parity] X == #[parity m] ∧ 2 <= X }} ->>
+                  {{ #[parity] X == #[parity m] ![ X => X - 2] }}
       X := X - 2
-                  {{ #[parity] X = #[parity m] }}
+                  {{ #[parity] X == #[parity m] }}
     end
-  {{ #[parity] X = #[parity m] /\ X < 2 }} ->>
-  {{ X = #[parity m] }} }>
+  {{ #[parity] X == #[parity m] ∧ X < 2 }} ->>
+  {{ X == #[parity m] }} }>
 
 
 theorem parity_outer_triple_valid : ∀ m,
@@ -449,33 +437,33 @@ theorem parity_outer_triple_valid : ∀ m,
 def two_loops_dec (a b c : Nat) : Decorated :=
   <d{
     {{ True }} ->>
-    {{ (Z = X + [c] /\ Y = 0) ![Z => [c]] ![Y => 0] ![X => 0] }}
+    {{ (Z == X + [c] ∧ Y == 0) ![Z => [c]] ![Y => 0] ![X => 0] }}
       X := 0
-                   {{ (Z = X + [c] /\ Y = 0) ![Z => [c]] ![Y => 0] }};
+                   {{ (Z == X + [c] ∧ Y == 0) ![Z => [c]] ![Y => 0] }};
       Y := 0
-                   {{ (Z = X + [c] /\ Y = 0) ![Z => [c]] }};
+                   {{ (Z == X + [c] ∧ Y == 0) ![Z => [c]] }};
       Z := [c]
-                   {{ (Z = X + [c] /\ Y = 0) }};
+                   {{ (Z == X + [c] ∧ Y == 0) }};
       while ~X == [a] do
-                   {{ (Z = X + [c] /\ Y = 0) /\ ~X = [a] }} ->>
-                   {{ (Z = X + [c] /\ Y = 0) ![Z => Z + 1] ![X => X + 1] }}
+                   {{ (Z == X + [c] ∧ Y == 0) ∧ ¬ X == [a] }} ->>
+                   {{ (Z == X + [c] ∧ Y == 0) ![Z => Z + 1] ![X => X + 1] }}
         X := X + 1
-                   {{ (Z = X + [c] /\ Y = 0) ![Z => Z + 1] }};
+                   {{ (Z == X + [c] ∧ Y == 0) ![Z => Z + 1] }};
         Z := Z + 1
-                   {{ (Z = X + [c] /\ Y = 0) }}
+                   {{ (Z == X + [c] ∧ Y == 0) }}
       end
-                   {{ Z = X + [c] /\ Y = 0 /\ X = [a] }} ->>
-                   {{ Z = [a] + Y + [c] }};
+                   {{ Z == X + [c] ∧ Y == 0 ∧ X == [a] }} ->>
+                   {{ Z == [a] + Y + [c] }};
       while ~Y == [b] do
-                   {{ Z = [a] + Y + [c] /\ ~Y = [b] }} ->>
-                   {{ Z = [a] + Y + [c] ![Z => Z + 1] ![Y => Y + 1]}}
+                   {{ Z == [a] + Y + [c] ∧ ¬Y == [b] }} ->>
+                   {{ Z == [a] + Y + [c] ![Z => Z + 1] ![Y => Y + 1]}}
         Y := Y + 1
-                   {{ Z = [a] + Y + [c] ![Z => Z + 1] }};
+                   {{ Z == [a] + Y + [c] ![Z => Z + 1] }};
         Z := Z + 1
-                   {{ Z = [a] + Y + [c] }}
+                   {{ Z == [a] + Y + [c] }}
       end
-    {{ Z = [a] + Y + [c] /\ Y = [b] }} ->>
-    {{ Z = [a + b + c] }}
+    {{ Z == [a] + Y + [c] ∧ Y == [b] }} ->>
+    {{ Z == [a + b + c] }}
   }>
 
 theorem two_loops a b c:
@@ -532,5 +520,4 @@ theorem HoareTriple.asgn_weakest Q X a:
       apply HP'
     simp
     unfold st2 at H
-    simp at H
     exact H

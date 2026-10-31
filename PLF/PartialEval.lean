@@ -6,15 +6,20 @@ namespace PLF.PE
 A list of key-value pairs representing a partial state mapping
 variable names to their values, i.e., `List (String × Nat)`.
 -/
+@[grind]
 def PartialState := List (String × Nat) deriving Membership
+@[grind]
 def PartialState.nil: PartialState := []
+@[grind]
 def PartialState.cons: String × Nat -> PartialState -> PartialState := List.cons
 
-
+@[grind]
 def PartialState.keys (ps: PartialState): List String := ps.map Prod.fst
+@[grind]
 def PartialState.values (ps: PartialState): List Nat := ps.map Prod.snd
 
 
+@[grind]
 def PartialState.ind.{u}
   {motive: PartialState -> Sort u}
   (nil: motive .nil)
@@ -24,15 +29,15 @@ def PartialState.ind.{u}
 | .nil => nil
 | .cons x xs => cons x xs (PartialState.ind nil cons xs)
 
-
+@[grind]
 def PartialState.lookup? (ps: PartialState) (k: String): Option Nat := ps.lookup k
 
-@[simp]
+@[simp, grind =]
 theorem PartialState.lookup?_nil (k: String): PartialState.lookup? .nil k = none := by
   simp [PartialState.lookup?, PartialState.nil]
 
 
-@[simp]
+@[simp, grind =]
 theorem PartialState.lookup?_cons {k1 k2: String} {v: Nat} {ps: PartialState}:
   (ps.cons (k1, v)).lookup? k2 = if k1 = k2 then some v else ps.lookup? k2
 := by
@@ -174,6 +179,7 @@ theorem PartialState.aexp_correct_weak {ps: PartialState} {st: State}:
     split <;> simp_all
 
 
+@[grind]
 def PartialState.override (ps: PartialState) (st: State): State :=
   match ps with
   | [] => st
@@ -183,9 +189,10 @@ example:
   PartialState.override [("x", 3), ("z", 2)] state![ "y" => 1] =
     state![ "x" => 3; "z" => 2; "y" => 1]
 := by
-  simp [PartialState.override, State.update]
+  simp [PartialState.override]
 
 
+@[simp, grind =]
 theorem PartialState.override_correct {ps: PartialState} {st: State} {k}:
   (ps.override st) k = match ps.lookup? k with
   | some v => v
@@ -201,11 +208,11 @@ theorem PartialState.override_correct {ps: PartialState} {st: State} {k}:
       simp [override, cons]
     case false NE =>
       simp [override, cons]
-      replace NE: k ≠ k' := by grind
-      simp [NE]
-      apply IH
+      rw [←IH]
+      apply State.update_neq
+      exact NE
 
-
+@[simp, grind .]
 theorem PartialState.override_consistent {ps: PartialState} {st: State}:
   ps.consistent (ps.override st)
 := by
@@ -213,7 +220,7 @@ theorem PartialState.override_consistent {ps: PartialState} {st: State}:
   rewrite [PartialState.override_correct]
   simp [H]
 
-
+@[grind =_]
 theorem PartialState.consistent_override {ps: PartialState} {st: State}:
   ps.consistent st ->
   forall k, st k = (ps.override st) k
@@ -228,7 +235,7 @@ theorem PartialState.consistent_override {ps: PartialState} {st: State}:
   case none =>
     simp
 
-
+@[simp, grind =]
 theorem PartialState.aexp_correct {ps: PartialState} {st: State} {a}:
   (ps.override st).aeval a = st.aeval (ps.aexp a)
 := by
@@ -246,7 +253,7 @@ theorem PartialState.aexp_correct {ps: PartialState} {st: State} {a}:
     . simp_all
     . simp_all
 
-
+@[grind]
 def PartialState.bexp (ps: PartialState): BExp -> BExp
 | .True => .True
 | .False => .False
@@ -305,7 +312,6 @@ theorem PartialState.bexp_correct {ps: PartialState} {st: State} {b}:
     simp [PartialState.bexp]
   case Eq | Le =>
     simp [PartialState.bexp]
-    simp [PartialState.aexp_correct]
     split
     . simp_all
       split
@@ -326,7 +332,7 @@ theorem PartialState.bexp_correct {ps: PartialState} {st: State} {b}:
     . simp_all
     . simp_all
 
-
+@[grind =]
 theorem PartialState.override_update_remove {ps: PartialState} {k v} {st: State}:
   (ps.override st).update k v = (ps.remove k).override (st.update k v)
 := by
@@ -334,7 +340,7 @@ theorem PartialState.override_update_remove {ps: PartialState} {k v} {st: State}
   simp [PartialState.override_correct]
   grind
 
-
+@[grind =]
 theorem PartialState.override_update_cons {ps: PartialState} {k v} {st: State}:
   (ps.override st).update k v = (ps.cons (k, v)).override st
 := by

@@ -75,27 +75,46 @@ def termToAExp: TSyntax `term → UnexpandM (TSyntax `lfp_aexp)
   | `([AExp| $x:lfp_aexp]) => pure x
   | `($t) => `(lfp_aexp| [ $t ] )
 
+def aexpPrecedence : TSyntax `term → Option Nat
+  | `([AExp| $_ + $_]) => some 50
+  | `([AExp| $_ - $_]) => some 50
+  | `([AExp| $_ * $_]) => some 60
+  | _ => none
+
+def termToAExpAt (t : TSyntax `term) (precedence : Nat) (isRight : Bool):
+  UnexpandM (TSyntax `lfp_aexp)
+:= do
+  let a ← termToAExp t
+  match aexpPrecedence t with
+  | some childPrecedence =>
+    if childPrecedence < precedence ||
+        (isRight && childPrecedence == precedence) then
+      `(lfp_aexp| ($a) )
+    else
+      pure a
+  | none => pure a
+
 @[app_unexpander AExp.Plus]
 def unexpanderAExpPlus : Unexpander
   | `($_ $x $y) => do
-    let x ← termToAExp x
-    let y ← termToAExp y
+    let x ← termToAExpAt x 50 false
+    let y ← termToAExpAt y 50 true
     `([AExp| $x + $y])
   | _ => throw ()
 
 @[app_unexpander AExp.Minus]
 def unexpanderAExpMinus : Unexpander
   | `($_ $x $y) => do
-    let x ← termToAExp x
-    let y ← termToAExp y
+    let x ← termToAExpAt x 50 false
+    let y ← termToAExpAt y 50 true
     `([AExp| $x - $y])
   | _ => throw ()
 
 @[app_unexpander AExp.Mult]
 def unexpanderAExpMult : Unexpander
   | `($_ $x $y) => do
-    let x ← termToAExp x
-    let y ← termToAExp y
+    let x ← termToAExpAt x 60 false
+    let y ← termToAExpAt y 60 true
     `([AExp| $x * $y])
   | _ => throw ()
 
@@ -112,6 +131,14 @@ def Z: String := "z"
 def E1 := [AExp| [Z] - Z * 3 + 2 * T + W]
 def E2 := [AExp| [E1] * [E1]]
 
+example: [AExp| X + Y + Z] = [AExp| (X + Y) + Z] := by
+  rfl
+
+example: [AExp| X + (Y + Z)] = [AExp| X + (Y + Z)] := by
+  rfl
+
+example: [AExp| [Z] - 2 * (3 + T)] = [AExp| [Z] - 2 * (3 + T)] := by
+  rfl
 
 example: E1 = [AExp| [Z] - Z * 3 + 2 * T + W] := by
   eq_refl
@@ -189,6 +216,25 @@ def termToBExp : TSyntax `term → UnexpandM (TSyntax `lfp_bexp)
   | `($t:ident) => `(lfp_bexp| $t:ident )
   | `($t) => `(lfp_bexp| [$t])
 
+def bexpPrecedence : TSyntax `term → Option Nat
+  | `([BExp| $_ && $_]) => some 20
+  | `([BExp| ~ $_]) => some 25
+  | `([BExp| $_:lfp_aexp == $_:lfp_aexp]) => some 30
+  | `([BExp| $_:lfp_aexp <= $_:lfp_aexp]) => some 30
+  | _ => none
+
+def termToBExpAt (t : TSyntax `term) (precedence : Nat) (isRight : Bool)
+    : UnexpandM (TSyntax `lfp_bexp) := do
+  let b ← termToBExp t
+  match bexpPrecedence t with
+  | some childPrecedence =>
+    if childPrecedence < precedence ||
+        (isRight && childPrecedence == precedence) then
+      `(lfp_bexp| ($b))
+    else
+      pure b
+  | none => pure b
+
 @[app_unexpander BExp.Eq]
 def unexpanderBExpEq : Unexpander
   | `($_ $x $y) => do
@@ -208,15 +254,15 @@ def unexpanderBExpLe : Unexpander
 @[app_unexpander BExp.Not]
 def unexpanderBExpNot : Unexpander
   | `($_ $b) => do
-    let b ← termToBExp b
+    let b ← termToBExpAt b 25 true
     `([BExp| ~ $b:lfp_bexp])
   | _ => throw ()
 
 @[app_unexpander BExp.And]
 def unexpanderBExpAnd : Unexpander
   | `($_ $b1 $b2) => do
-    let b1 ← termToBExp b1
-    let b2 ← termToBExp b2
+    let b1 ← termToBExpAt b1 20 false
+    let b2 ← termToBExpAt b2 20 true
     `([BExp| $b1:lfp_bexp && $b2:lfp_bexp])
   | _ => throw ()
 
@@ -236,14 +282,62 @@ example: B1 = [BExp| 4 <= 2 && ~3 == 4 + 3 && ~true] := by
 example: BExp.And B1 B2 = [BExp| B1 && B2] := by
   eq_refl
 
+example: BExp.Not (BExp.And BExp.True BExp.False) =
+  [BExp| ~(true && false)]
+:= by
+  rfl
+
+example: BExp.And BExp.True (BExp.And BExp.False BExp.True) =
+  [BExp| true && (false && true)]
+:= by
+  rfl
+
 end Playground
 
 
 @[grind]
-abbrev State := TotalMap Nat
-@[simp] def State.empty: State := TotalMap.empty 0
-@[simp] def State.update: State → String → Nat → State := TotalMap.update
+def State := TotalMap Nat
+def State.empty: State := TotalMap.empty 0
+def State.update: State → String → Nat → State := TotalMap.update
 
+@[simp, grind =]
+theorem State.apply_empty {x: String}:
+  (State.empty) x = 0
+:= by
+  unfold State.empty
+  apply TotalMap.apply_empty
+
+@[simp, grind =]
+theorem State.update_eq {st: State} {x: String} {v: Nat}:
+  (st.update x v) x = v
+:= by
+  unfold State.update
+  apply TotalMap.update_eq
+
+@[simp, grind =]
+theorem State.update_neq {m: State} {x1 x2 v}:
+  x1 ≠ x2 -> map![x1 => v; m] x2 = m x2
+:= by
+  apply TotalMap.update_neq
+
+@[simp, grind =]
+theorem State.update_shadow {m : State} {x v1 v2}:
+  map![x => v2 ; x => v1 ; m] = map![x => v2 ; m]
+:= by
+  apply TotalMap.update_shadow
+
+@[simp, grind =]
+theorem State.update_same {m : State} {x}:
+  map![x => m x ; m] = m
+:= by
+  apply TotalMap.update_same
+
+@[simp, grind =]
+theorem State.update_permute {m : State} {x1 x2 v1 v2}:
+  x1 ≠ x2 ->
+  map![x1 => v1 ; x2 => v2 ; m] =  map![x2 => v2 ; x1 => v1 ; m]
+:= by
+  apply TotalMap.update_permute
 
 @[simp, grind]
 def State.aeval (st: State) (a: AExp): Nat := match a with
