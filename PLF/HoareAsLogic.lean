@@ -1,6 +1,6 @@
 import PLF.Hoare
 
-
+@[grind]
 inductive Derivable : Assertion -> Imp -> Assertion -> Prop where
   | HSkip {P}: Derivable P <{skip}> P
   | HAsgn {Q V a}:
@@ -20,7 +20,7 @@ inductive Derivable : Assertion -> Imp -> Assertion -> Prop where
     (Q2 ->> Q1) ->
     Derivable P1 c Q1
 
-
+@[grind .]
 theorem Derivable.HConsequencePre {P1 P2 Q : Assertion} {c}:
   Derivable P2 c Q ->
   (P1 ->> P2) ->
@@ -32,7 +32,7 @@ theorem Derivable.HConsequencePre {P1 P2 Q : Assertion} {c}:
   . apply HImp
   . simp
 
-
+@[grind .]
 theorem Derivable.HConsequencePost {P Q1 Q2: Assertion} {c}:
   Derivable P c Q2 ->
   (Q2 ->> Q1) ->
@@ -59,6 +59,7 @@ example:
 theorem Assertion.implies.true_post {P}: P ->> True := fun _ _ => True.intro
 theorem Assertion.implies.false_pre {Q}: False ->> Q := fun _ f => f.elim
 
+@[grind .]
 theorem Derivable.true_post {c P}:
   Derivable P c True
 := match c with
@@ -68,24 +69,28 @@ theorem Derivable.true_post {c P}:
   | .If _ _ _ => .HIf .true_post .true_post
   | .While _ _ => .HConsequence (.HWhile .true_post) .true_post .true_post
 
-
+@[grind .]
 theorem Derivable.false_pre {c Q}:
   Derivable False c Q
-:= match c with
-  | .Skip => .HConsequencePre .HSkip .false_pre
-  | .Seq _ _ => Derivable.HSeq .false_pre .false_pre
-  | .Asgn _ _ => .HConsequencePre .HAsgn .false_pre
-  | .If _ _ _ => by
+:= by
+  induction c generalizing Q
+  case Skip =>
+    apply Derivable.HConsequencePre .HSkip .false_pre
+  case Seq c1 c2 IHc1 IHc2 =>
+    apply Derivable.HSeq IHc2 IHc1
+  case Asgn X a =>
+    apply Derivable.HConsequencePre .HAsgn .false_pre
+  case If b c1 c2 IHc1 IHc2 =>
     apply Derivable.HIf
     . simp
-      apply Derivable.false_pre
+      apply IHc1
     . simp
-      apply Derivable.false_pre
-  | .While _ _ => by
+      apply IHc2
+  case While b c IHc =>
     apply Derivable.HConsequence
     . apply Derivable.HWhile (P := False)
       simp
-      apply Derivable.false_pre
+      apply IHc
     . apply Assertion.implies.false_pre
     . simp
 
@@ -200,7 +205,7 @@ theorem Imp.complete_aux c: forall P Q,
       apply Imp.wp.is_precondition
   | .If b c1 c2 => by
     intros P Q HHoare
-    apply Derivable.HIf <;> simp
+    apply Derivable.HIf
     . /- true -/
       apply c1.complete_aux
       intros st1 st2 B12 HP
@@ -214,14 +219,14 @@ theorem Imp.complete_aux c: forall P Q,
       intros st1 st2 B12 HP
       apply HHoare st1 st2
       . apply BigStep.IfFalse
-        . apply HP.right
+        . simp at HP
+          apply HP.right
         . apply B12
       . apply HP.left
   | .While b c => by
     intros P Q HHoare
     apply Derivable.HConsequence
     . apply Derivable.HWhile (P := ((While b c).wp Q))
-      simp
       apply c.complete_aux
       apply Imp.wp.invariant
     . apply Imp.wp.is_weakest

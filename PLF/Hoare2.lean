@@ -165,25 +165,24 @@ def DImp.verifcation_conds (P: Assertion) (d: DImp): Prop :=
 theorem DImp.verifcation_conds_correct (d: DImp) P:
   d.verifcation_conds P -> {{ P }}< d.erase >{{ [d.post_cond] }}
 := by
-  revert P
-  induction d with
-  | Skip Q =>
-    intros P HPre
+  induction d generalizing P
+  case Skip Q =>
+    intro  HPre
     simp
     apply HoareTriple.consequence_pre <;> try solve_by_elim
     . apply HoareTriple.skip
-  | Seq d1 d2 IHd1 IHd2 =>
+  case Seq d1 d2 IHd1 IHd2 =>
     simp
-    intros P HPd1 HPd2
+    intro HPd1 HPd2
     apply HoareTriple.seq <;> try solve_by_elim
-  | Asgn x a Q =>
-    intros P HPre
+  case Asgn x a Q =>
+    intro HPre
     simp
     apply HoareTriple.consequence_pre
     . apply HoareTriple.asgn
     . exact HPre
-  | If b p1 d1 p2 d2 Q IHd1 IHd2 =>
-    intros P HPre
+  case If b p1 d1 p2 d2 Q IHd1 IHd2 =>
+    intro HPre
     simp; simp at HPre
     let ⟨HT, ⟨HF, ⟨Hd1Q, ⟨Hd2Q, ⟨HThen, HElse⟩⟩⟩⟩⟩ := HPre
     specialize (IHd1 _ HThen)
@@ -193,8 +192,8 @@ theorem DImp.verifcation_conds_correct (d: DImp) P:
       apply HoareTriple.consequence <;> (try simp) <;> trivial
     . -- case false
       apply HoareTriple.consequence <;> (try simp) <;> trivial
-  | While b Q d R IHd =>
-    intros P HPre
+  case While b Q d R IHd =>
+    intro HPre
     simp; simp at HPre
     let ⟨HP, ⟨HBody, ⟨HPost, Hd⟩⟩⟩ := HPre
     specialize (IHd _ Hd)
@@ -207,13 +206,13 @@ theorem DImp.verifcation_conds_correct (d: DImp) P:
     . apply HP
     . simp
       apply HPost
-  | Pre R d IHd =>
-    intros P HPre
+  case Pre R d IHd =>
+    intro HPre
     let ⟨HP, HD⟩ := HPre
     simp
     apply HoareTriple.consequence_pre <;> solve_by_elim
-  | Post d Q IHd =>
-    intros P HPre
+  case Post d Q IHd =>
+    intro HPre
     let ⟨HP, HD⟩ := HPre
     apply HoareTriple.consequence_post <;> solve_by_elim
 
@@ -483,7 +482,6 @@ def HoareTriple.is_wp P c Q :=
 example:
   HoareTriple.is_wp {{ Y <= 4 }} <{X := Y + 1}> {{ X <= 5 }}
 := by
-  simp
   apply And.intro
   . apply HoareTriple.consequence_pre
     . apply HoareTriple.asgn
@@ -499,10 +497,11 @@ example:
         simp
       . apply HP'
     unfold st2 at H
-    simp at H
+    simp_all
     omega
 
 
+@[grind .]
 theorem HoareTriple.asgn_weakest Q X a:
   HoareTriple.is_wp ({{ Q ![[X] => [a]] }}) <{ [X] := [a] }> Q
 := by
