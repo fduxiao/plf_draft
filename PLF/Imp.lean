@@ -451,7 +451,7 @@ macro_rules
 
 def termToImp: TSyntax `term → UnexpandM (TSyntax `lfp_imp)
   | `(<{$x:lfp_imp}>) => pure x
-  | `($t) => `(lfp_imp| [$t])
+  | `($t) => `(lfp_imp| $t:term )
 
 @[app_unexpander Imp.Skip]
 def unexpanderSkip : Unexpander
