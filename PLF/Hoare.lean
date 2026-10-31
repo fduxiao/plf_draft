@@ -261,7 +261,7 @@ theorem HoareTriple.seq {P Q R c1 c2}:
   intros Hc2 Hc1
   intros st1 st3
   intros B HP
-  cases B with | @BSeq c1 c2 st1 st2 st3 H12 H23 =>
+  cases B with | @Seq c1 c2 st1 st2 st3 H12 H23 =>
   specialize (Hc1 st1 st2 H12 HP)
   specialize (Hc2 st2 st3 H23 Hc1)
   exact Hc2
@@ -310,7 +310,7 @@ theorem HoareTriple.asgn {Q} {X: String} {a: AExp}:
   {{ Q ![[X] => [a]] }}< [X] := [a] >{{ Q }}
 := by
   intros st1 st2 B HPre
-  cases B with | @BAsgn _ _ n _ E =>
+  cases B with | @Asgn _ _ n _ E =>
   simp at HPre
   rewrite[<-E]
   apply HPre
@@ -329,7 +329,7 @@ example : exists a: AExp,
   let st1 := state!["X" => 3]
   let st2 := st1.update "X" (st1.aeval a)
   have H: st1 =[ X := [a] ]=> st2 := by
-    apply Imp.BigStep.BAsgn
+    apply Imp.BigStep.Asgn
     eq_refl
   specialize (contra st1 st2 H True.intro)
   unfold st2 a at contra
@@ -346,7 +346,7 @@ theorem HoareTriple.asgn_fwd {m: Nat} {X: String} {a} {P : State.Assertion}:
 := by
   simp
   intros st1 st2 B H1
-  cases B with | @BAsgn _ _ n _ E =>
+  cases B with | @Asgn _ _ n _ E =>
   let ⟨HP, Exm⟩ := H1
   have MEq: (TotalMap.update (st1.update X n) X m) = st1 := by
     unfold State.update
@@ -369,7 +369,7 @@ theorem HoareTriple.asgn_fwd_exists a {X: String} {P: State.Assertion}:
 := by
   intros st1 st2 B HP
   exists st1.aeval X
-  cases B with | @BAsgn _ _ n _ E =>
+  cases B with | @Asgn _ _ n _ E =>
   unfold State.update
   apply And.intro
   . rewrite [TotalMap.update_shadow]
@@ -443,7 +443,7 @@ example: {{ X <= 5 }}< X := 2 * X >{{ X <= 10 }} := by
   simp
   intros st1 st2
   intros B H1
-  cases B with | BAsgn E =>
+  cases B with | Asgn E =>
   subst E
   simp
   apply Nat.mul_le_mul_left 2 H1
@@ -487,12 +487,12 @@ theorem HoareTriple.if {P Q} {b: BExp} {c1 c2}:
   intros HTrue HFalse
   intros st1 st2 B HPre
   cases B with
-  | BIfTrue HT B =>
+  | IfTrue HT B =>
     specialize (HTrue st1 st2 B)
     simp at HTrue
     specialize (HTrue HPre HT)
     apply HTrue
-  | BIfFalse HF B =>
+  | IfFalse HF B =>
     specialize (HFalse st1 st2 B)
     simp at HFalse
     specialize (HFalse HPre HF)
@@ -556,10 +556,10 @@ theorem HoareTriple.while {P} {b: BExp} {c}:
   generalize E: <{ while b do c end }> = prog
   intros B HPre
   induction B with
-  | @BWhileFalse b c st HF =>
+  | @WhileFalse b c st HF =>
     cases E
     trivial
-  | @BWhileTrue b c st1 st2 st3 HT H12 H23 IH12 IH23 =>
+  | @WhileTrue b c st1 st2 st3 HT H12 H23 IH12 IH23 =>
     cases E
     specialize (HHoare st1 st2 H12)
     simp at *

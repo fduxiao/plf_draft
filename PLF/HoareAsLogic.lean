@@ -153,16 +153,16 @@ theorem Imp.wp.invariant b (c: Imp) (Q):
   . simp [wp]
     intros st1 H HT st2 B12 st3 B23
     cases B23 with
-    | BWhileFalse HF =>
+    | WhileFalse HF =>
       apply H
-      apply BigStep.BWhileTrue HT
+      apply BigStep.WhileTrue HT
       apply B12
-      apply BigStep.BWhileFalse HF
-    | BWhileTrue HT2 B23 BW =>
+      apply BigStep.WhileFalse HF
+    | WhileTrue HT2 B23 BW =>
       apply H
-      apply BigStep.BWhileTrue HT
+      apply BigStep.WhileTrue HT
       . apply B12
-      . apply BigStep.BWhileTrue HT2
+      . apply BigStep.WhileTrue HT2
         . apply B23
         . apply BW
 
@@ -176,14 +176,14 @@ def Imp.complete_aux c: forall P Q,
     . apply Derivable.HSkip
     . intros st HP
       apply HHoare
-      apply BigStep.BSkip
+      apply BigStep.Skip
       apply HP
   | .Asgn x a => by
     intros P Q HHoare
     apply Derivable.HConsequencePre .HAsgn
     intros st HP
     apply HHoare
-    . apply Imp.BigStep.BAsgn
+    . apply Imp.BigStep.Asgn
       eq_refl
     . apply HP
   | .Seq c1 c2 => by
@@ -194,7 +194,7 @@ def Imp.complete_aux c: forall P Q,
       intros st3 B23
       specialize (HHoare st1 st3)
       apply HHoare
-      . apply BigStep.BSeq B12 B23
+      . apply BigStep.Seq B12 B23
       . apply HP
     . apply c2.complete_aux
       apply Imp.wp.is_precondition
@@ -205,7 +205,7 @@ def Imp.complete_aux c: forall P Q,
       apply c1.complete_aux
       intros st1 st2 B12 HP
       apply HHoare st1 st2
-      . apply BigStep.BIfTrue
+      . apply BigStep.IfTrue
         . apply HP.right
         . apply B12
       . apply HP.left
@@ -213,7 +213,7 @@ def Imp.complete_aux c: forall P Q,
       apply c2.complete_aux
       intros st1 st2 B12 HP
       apply HHoare st1 st2
-      . apply BigStep.BIfFalse
+      . apply BigStep.IfFalse
         . apply HP.right
         . apply B12
       . apply HP.left
@@ -229,7 +229,7 @@ def Imp.complete_aux c: forall P Q,
     . simp [wp]
       intro st H HB
       apply H
-      apply BigStep.BWhileFalse
+      apply BigStep.WhileFalse
       apply HB
 
 

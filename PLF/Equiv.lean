@@ -2,12 +2,11 @@ import PLF.Imp
 import PLF.Relation
 
 
-@[simp]
+@[grind]
 def AExp.equiv: Relation AExp := fun (a1 a2: AExp) =>
   forall (st: State), st.aeval a1 = st.aeval a2
 
-
-@[simp]
+@[grind]
 def BExp.equiv: Relation BExp := fun (b1 b2: BExp) =>
   forall (st: State), st.beval b1 = st.beval b2
 
@@ -29,52 +28,52 @@ def Imp.equiv: Relation Imp := fun (c1 c2: Imp) =>
 def Imp.refines: Relation Imp := fun (c1 c2 : Imp) =>
   forall (st1 st2 : State), (st1 =[ c1 ]=> st2) → (st1 =[ c2 ]=> st2)
 
-
+@[grind .]
 theorem Imp.skip_left {c: Imp}: <{ skip; c }>.equiv c := by
   intros st1 st2
   apply Iff.intro
   . intros H
-    cases H with
-    | @BSeq _ _ _ st3 _ H13 H32 =>
+    cases H
+    case Seq H13 H32 =>
       cases H13
       apply H32
   . intros H
-    apply BigStep.BSeq
-    . apply BigStep.BSkip
+    apply BigStep.Seq
+    . apply BigStep.Skip
     . exact H
 
-
+@[grind .]
 theorem Imp.skip_right {c: Imp}: <{ c; skip }>.equiv c := by
   intros st1 st2
   apply Iff.intro
   . intros H
-    cases H with
-    | @BSeq _ _ _ st3 _ H13 H32 =>
+    cases H
+    case Seq H13 H32 =>
       cases H32
       apply H13
   . intros H
-    apply BigStep.BSeq
+    apply BigStep.Seq
     . exact H
-    . apply BigStep.BSkip
+    . apply BigStep.Skip
 
-
+@[grind .]
 theorem Imp.if_true_simple {c1 c2: Imp}:
   <{ if true then c1 else c2 end }>.equiv c1
 := by
   intros st1 st2
   apply Iff.intro
   . intros H
-    cases H with
-    | BIfTrue HT HB =>
+    cases H
+    case IfTrue HT HB =>
       apply HB
-    | BIfFalse HF _ =>
+    case IfFalse HF _ =>
       simp at HF
   . intros H
-    apply BigStep.BIfTrue
+    apply BigStep.IfTrue
     . simp
     . exact H
 
-
+@[grind .]
 theorem Imp.if_true {b: BExp} {c1 c2: Imp}:
   b.equiv .True -> <{ if b then c1 else c2 end }>.equiv c1
 := by
@@ -82,20 +81,20 @@ theorem Imp.if_true {b: BExp} {c1 c2: Imp}:
   intros st1 st2
   apply Iff.intro
   . intros K
-    cases K with
-    | BIfTrue HT K =>
+    cases K
+    case IfTrue HT K =>
       exact K
-    | BIfFalse HF K =>
+    case IfFalse HF K =>
       specialize (H st1)
       simp at H
       rewrite [HF] at H
       contradiction
   . intros K
-    apply BigStep.BIfTrue
+    apply BigStep.IfTrue
     . apply H
     . exact K
 
-
+@[grind .]
 theorem Imp.if_false {b: BExp} {c1 c2: Imp}:
   b.equiv .False -> <{ if b then c1 else c2 end }>.equiv c2
 := by
@@ -103,20 +102,20 @@ theorem Imp.if_false {b: BExp} {c1 c2: Imp}:
   intros st1 st2
   apply Iff.intro
   . intros K
-    cases K with
-    | BIfFalse _ K =>
+    cases K
+    case IfFalse _ K =>
       exact K
-    | BIfTrue HF K =>
+    case IfTrue HF K =>
       specialize (H st1)
       simp at H
       rewrite [HF] at H
       contradiction
   . intros K
-    apply BigStep.BIfFalse
+    apply BigStep.IfFalse
     . apply H
     . exact K
 
-
+@[grind .]
 theorem Imp.swap_if_branches {b: BExp} {c1 c2: Imp}:
   <{ if b then c1 else c2 end }>.equiv <{ if ~b then c2 else c1 end }>
 := by
@@ -126,50 +125,50 @@ theorem Imp.swap_if_branches {b: BExp} {c1 c2: Imp}:
     generalize E: st1.beval b = t
     cases t with
     | true =>
-      apply BigStep.BIfFalse
+      apply BigStep.IfFalse
       . simp
         exact E
       . cases H with
-        | BIfTrue _ H =>
+        | IfTrue _ H =>
           apply H
-        | BIfFalse HF =>
+        | IfFalse HF =>
           rewrite [E] at HF
           contradiction
     | false =>
-      apply BigStep.BIfTrue
+      apply BigStep.IfTrue
       . simp
         exact E
       . cases H with
-        | BIfTrue HT _ =>
+        | IfTrue HT _ =>
           rewrite [E] at HT
           contradiction
-        | BIfFalse _ H =>
+        | IfFalse _ H =>
           exact H
   . intros H
     generalize E: st1.beval b = t
     cases t with
     | false =>
-      apply BigStep.BIfFalse
+      apply BigStep.IfFalse
       . exact E
       . cases H with
-        | BIfTrue _ H =>
+        | IfTrue _ H =>
           apply H
-        | BIfFalse HF =>
+        | IfFalse HF =>
           simp at HF
           rewrite [E] at HF
           contradiction
     | true =>
-      apply BigStep.BIfTrue
+      apply BigStep.IfTrue
       . exact E
       . cases H with
-        | BIfTrue HT _ =>
+        | IfTrue HT _ =>
           simp at HT
           rewrite [E] at HT
           contradiction
-        | BIfFalse _ H =>
+        | IfFalse _ H =>
           exact H
 
-
+@[grind .]
 theorem Imp.while_false {b: BExp} {c: Imp}:
   b.equiv false ->
   <{ while b do c end }>.equiv <{ skip }>
@@ -180,30 +179,30 @@ theorem Imp.while_false {b: BExp} {c: Imp}:
   apply Iff.intro
   . intro HW
     cases HW with
-    | BWhileTrue HT =>
+    | WhileTrue HT =>
       rewrite [Hb] at HT
       contradiction
-    | BWhileFalse =>
-      apply BigStep.BSkip
+    | WhileFalse =>
+      apply BigStep.Skip
   . intros H
     cases H
-    apply BigStep.BWhileFalse
+    apply BigStep.WhileFalse
     exact Hb
 
 
+@[grind .]
 theorem Imp.while_true_nonterm {b: BExp} {c st1 st2}:
-  b.equiv true -> Not ( st1 =[ while b do c end ]=> st2 )
+  b.equiv [BExp| true ] -> ¬ ( st1 =[ while b do c end ]=> st2 )
 := by
-  simp
   intros Hb
   generalize E: <{ while b do c end }> = l
   intros contra
   induction contra with
-  | BWhileTrue HT H12 H23 IH1 IH2 =>
+  | WhileTrue HT H12 H23 IH1 IH2 =>
     cases E
     apply IH2
     eq_refl
-  | BWhileFalse HF =>
+  | WhileFalse HF =>
     cases E
     rewrite [Hb] at HF
     contradiction
@@ -225,8 +224,8 @@ theorem Imp.while_true {b: BExp} {c}:
   . intros HW
     exfalso
     apply Imp.while_true_nonterm (b := .True) (c := .Skip)
-    simp
-    apply HW
+    . grind
+    . apply HW
 
 
 theorem Imp.loop_unrolling {b c}:
@@ -239,43 +238,43 @@ theorem Imp.loop_unrolling {b c}:
   | true =>
     apply Iff.intro
     . intros H
-      apply BigStep.BIfTrue E
+      apply BigStep.IfTrue E
       cases H with
-      | BWhileTrue _ H1 H2=>
-        apply BigStep.BSeq H1
+      | WhileTrue _ H1 H2=>
+        apply BigStep.Seq H1
         exact H2
-      | BWhileFalse HF =>
+      | WhileFalse HF =>
         rewrite [E] at HF
         contradiction
     . intros H
       cases H with
-      | BIfTrue HT H =>
+      | IfTrue HT H =>
         cases H with
-        | @BSeq _ _ st1 t st2 H1t Ht2 =>
-          apply BigStep.BWhileTrue E
+        | @Seq _ _ st1 t st2 H1t Ht2 =>
+          apply BigStep.WhileTrue E
           . apply H1t
           . apply Ht2
-      | BIfFalse HF =>
+      | IfFalse HF =>
         rewrite [E] at HF
         contradiction
   | false =>
     apply Iff.intro
     . intros H
-      apply BigStep.BIfFalse E
+      apply BigStep.IfFalse E
       cases H with
-      | BWhileTrue HT =>
+      | WhileTrue HT =>
         rewrite [E] at HT
         contradiction
-      | BWhileFalse =>
-        apply BigStep.BSkip
+      | WhileFalse =>
+        apply BigStep.Skip
     . intros H
       cases H with
-      | BIfTrue HT =>
+      | IfTrue HT =>
         rewrite [E] at HT
         contradiction
-      | BIfFalse _ H =>
+      | IfFalse _ H =>
         cases H
-        apply BigStep.BWhileFalse
+        apply BigStep.WhileFalse
         exact E
 
 
@@ -286,19 +285,19 @@ theorem Imp.seq_assoc {c1 c2 c3}:
   apply Iff.intro
   . intros H
     cases H with
-    | @BSeq _ _ _ st3 _ H1 H3 =>
+    | @Seq _ _ _ st3 _ H1 H3 =>
       cases H1 with
-      | @BSeq _ _ _ st2 _ H1 H2 =>
-        apply H1.BSeq
-        apply H2.BSeq
+      | @Seq _ _ _ st2 _ H1 H2 =>
+        apply H1.Seq
+        apply H2.Seq
         apply H3
   . intros H
     cases H with
-    | @BSeq _ _ _ st2 _ H1 H2 =>
+    | @Seq _ _ _ st2 _ H1 H2 =>
       cases H2 with
-      | @BSeq _ _ _ st3 _ H2 H3 =>
-        apply BigStep.BSeq
-        . apply H1.BSeq
+      | @Seq _ _ _ st3 _ H2 H3 =>
+        apply BigStep.Seq
+        . apply H1.Seq
           apply H2
         . exact H3
 
@@ -312,18 +311,18 @@ theorem Imp.identity_assignment {x}:
   apply Iff.intro
   . intros H
     cases H with
-    | @BAsgn _ _ n _ H =>
+    | @Asgn _ _ n _ H =>
       simp at H
       rewrite [H] at E
       rewrite [E]
-      apply BigStep.BSkip
+      apply BigStep.Skip
   . intros H
     have E: st2 = st1.update x (st1 x) := by
       cases H
       symm
       exact E
     rewrite [E]
-    apply BigStep.BAsgn
+    apply BigStep.Asgn
     eq_refl
 
 theorem Imp.assign_aequiv {x: String} {a}:
@@ -340,17 +339,17 @@ theorem Imp.assign_aequiv {x: String} {a}:
       cases H
       apply TotalMap.update_same
     rewrite [<-E]
-    apply BigStep.BAsgn
+    apply BigStep.Asgn
     eq_refl
   . intros H
     cases H with
-    | BAsgn E =>
+    | Asgn E =>
       rewrite [E] at Hx
       rewrite [<-Hx]
       let E := st1.update_same (x := x)
       unfold State.update
       rewrite [E]
-      apply BigStep.BSkip
+      apply BigStep.Skip
 
 
 instance: Reflexive AExp.equiv where
@@ -421,17 +420,17 @@ theorem Imp.Asgn.congruence_st {x} {a1 a2: AExp} {st1: State}:
   apply Iff.intro
   . intros H
     cases H with
-    | BAsgn H =>
+    | Asgn H =>
       rewrite [<-H]
       rewrite [E]
-      apply BigStep.BAsgn
+      apply BigStep.Asgn
       eq_refl
   . intros H
     cases H with
-    | BAsgn H =>
+    | Asgn H =>
       rewrite [<-H]
       rewrite [<-E]
-      apply BigStep.BAsgn
+      apply BigStep.Asgn
       eq_refl
 
 
@@ -457,14 +456,14 @@ theorem Imp.While.congruence {b1 b2: BExp} {c1 c2: Imp}:
       generalize E: <{ while b1 do c1 end }> = t
       intros H
       induction H with
-      | @BWhileFalse b c st HF =>
+      | @WhileFalse b c st HF =>
         cases E
         rewrite [Hb] at HF
-        apply BigStep.BWhileFalse HF
-      | @BWhileTrue b c st1 st2 st3 HT H12 H23 IH12 IH23 =>
+        apply BigStep.WhileFalse HF
+      | @WhileTrue b c st1 st2 st3 HT H12 H23 IH12 IH23 =>
         cases E
         rewrite [Hb] at HT
-        apply BigStep.BWhileTrue HT
+        apply BigStep.WhileTrue HT
         . apply Hc.mp
           apply H12
         . apply IH23
@@ -490,16 +489,16 @@ theorem Imp.Seq.congruence {c1 c2 d1 d2: Imp}:
   apply Iff.intro
   . intros H
     cases H with
-    | @BSeq _ _ _ t _ H1 H2 =>
-      apply BigStep.BSeq
+    | @Seq _ _ _ t _ H1 H2 =>
+      apply BigStep.Seq
       . apply Hc.mp
         apply H1
       . apply Hd.mp
         apply H2
   . intros H
     cases H with
-    | @BSeq _ _ _ t _ H1 H2 =>
-      apply BigStep.BSeq
+    | @Seq _ _ _ t _ H1 H2 =>
+      apply BigStep.Seq
       . apply Hc.mpr
         apply H1
       . apply Hd.mpr
@@ -519,21 +518,21 @@ theorem Imp.If.congruence {b1 b2: BExp} {c1 c2 d1 d2: Imp}:
     apply Iff.intro
     . intros H
       cases H with
-      | BIfTrue _ H =>
+      | IfTrue _ H =>
         rewrite [Hb] at E
-        apply BigStep.BIfTrue E
+        apply BigStep.IfTrue E
         apply Hc.mp
         exact H
-      | BIfFalse HF =>
+      | IfFalse HF =>
         rewrite [E] at HF
         contradiction
     . intros H
       cases H with
-      | BIfTrue _ H =>
-        apply BigStep.BIfTrue E
+      | IfTrue _ H =>
+        apply BigStep.IfTrue E
         rewrite [Hc]
         exact H
-      | BIfFalse HF =>
+      | IfFalse HF =>
         rewrite [Hb] at E
         rewrite [E] at HF
         contradiction
@@ -541,22 +540,22 @@ theorem Imp.If.congruence {b1 b2: BExp} {c1 c2 d1 d2: Imp}:
     apply Iff.intro
     . intros H
       cases H with
-      | BIfTrue HT =>
+      | IfTrue HT =>
         rewrite [E] at HT
         contradiction
-      | BIfFalse _ H =>
+      | IfFalse _ H =>
         rewrite [Hb] at E
-        apply BigStep.BIfFalse E
+        apply BigStep.IfFalse E
         apply Hd.mp
         exact H
     . intros H
       cases H with
-      | BIfTrue HT =>
+      | IfTrue HT =>
         rewrite [Hb] at E
         rewrite [E] at HT
         contradiction
-      | BIfFalse _ H =>
-        apply BigStep.BIfFalse E
+      | IfFalse _ H =>
+        apply BigStep.IfFalse E
         apply Hd.mpr
         exact H
 
@@ -910,12 +909,12 @@ theorem AExp.subst.inequiv: Not AExp.subst.equiv_property := by
   specialize (@H X Y a1 a2 st1 st3)
   have T: <{ [X] := [a1]; [Y] := [a2.subst X a1] }>.BigStep st1 st3
   := by
-    apply Imp.BigStep.BSeq
-    . apply Imp.BigStep.BAsgn (n := 1)
+    apply Imp.BigStep.Seq
+    . apply Imp.BigStep.Asgn (n := 1)
       unfold a1
       unfold st1
       eq_refl
-    . apply Imp.BigStep.BAsgn
+    . apply Imp.BigStep.Asgn
       eq_refl
 
   have K {st1 st2: State}:
@@ -924,16 +923,16 @@ theorem AExp.subst.inequiv: Not AExp.subst.equiv_property := by
   := by
     intros H
     cases H with
-    | @BAsgn _ _ n x E =>
+    | @Asgn _ _ n x E =>
       simp
       symm
       exact E
 
   let H := H.mpr T
   cases H with
-  | @BSeq _ _ _ t1 _ H1 H2 =>
+  | @Seq _ _ _ t1 _ H1 H2 =>
     cases H1 with
-    | @BAsgn _ _ n1 x E1 =>
+    | @Asgn _ _ n1 x E1 =>
       rewrite [<-E1] at H2
       rewrite [Hst12] at H2
       specialize (K H2)
@@ -1026,7 +1025,7 @@ theorem AExp.subst.equiv_property {x1 x2} {a1 a2: AExp}:
   let st2 := st1.update x1 (st1.aeval a1)
 
   have H12: st1 =[ [x1] := [a1] ]=> st2 := by
-    apply Imp.BigStep.BAsgn
+    apply Imp.BigStep.Asgn
     eq_refl
 
   have Ust2 {t}: st1 =[ [x1] := [a1] ]=> t -> t = st2 := by
@@ -1063,15 +1062,15 @@ theorem AExp.subst.equiv_property {x1 x2} {a1 a2: AExp}:
   apply Iff.intro <;> (
     intros H
     cases H with
-    | @BSeq _ _ _ t _ H1 H2 =>
+    | @Seq _ _ _ t _ H1 H2 =>
       specialize (Ust2 H1)
       cases H2 with
-      | BAsgn E =>
-        apply Imp.BigStep.BSeq
+      | Asgn E =>
+        apply Imp.BigStep.Seq
         . apply H1
         . subst Ust2
           rewrite [<-E]
-          apply Imp.BigStep.BAsgn
+          apply Imp.BigStep.Asgn
           rewrite [K]
           eq_refl
   )
@@ -1085,4 +1084,4 @@ theorem Imp.loop.not_equiv_skip:
   apply Imp.while_true_nonterm
   . apply BExp.equiv.refl
   . apply H.mpr
-    apply BigStep.BSkip
+    apply BigStep.Skip

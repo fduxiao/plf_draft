@@ -507,7 +507,7 @@ example:
     simp at HHoare
     have H: st2 "Y" < 5 := by
       apply HHoare
-      . apply Imp.BigStep.BAsgn
+      . apply Imp.BigStep.Asgn
         simp
       . apply HP'
     unfold st2 at H
@@ -527,7 +527,7 @@ theorem HoareTriple.asgn_weakest Q X a:
     have H: Q st2 := by
       apply HHoare
       . unfold st2
-        apply Imp.BigStep.BAsgn
+        apply Imp.BigStep.Asgn
         simp
       apply HP'
     simp
