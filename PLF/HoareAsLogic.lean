@@ -160,7 +160,7 @@ theorem WP.skip_eq {Q: Assertion}:
   . grind
 
 @[grind =]
-theorem WP.asign_eq {x a} {Q: Assertion}:
+theorem WP.asgn_eq {x a} {Q: Assertion}:
   WP (.Asgn x a) Q = {{ Q ![[x] => [a]]}}
 := by
   ext
@@ -295,7 +295,7 @@ theorem Derivable.wp {c Q}:
     simp [WP.skip_eq]
     apply Derivable.Skip
   case Asgn x a =>
-    simp [WP.asign_eq]
+    simp [WP.asgn_eq]
     apply Derivable.Asgn
   case Seq c1 c2 IH1 IH2 =>
     simp [WP.seq_eq]
