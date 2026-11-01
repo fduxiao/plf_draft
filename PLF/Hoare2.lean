@@ -201,11 +201,9 @@ theorem DImp.verifcation_conds_correct (d: DImp) P:
     . apply HoareTriple.while
       apply HoareTriple.consequence_pre
       . apply IHd
-      . simp
-        apply HBody
+      . apply HBody
     . apply HP
-    . simp
-      apply HPost
+    . apply HPost
   case Pre R d IHd =>
     intro HPre
     let ⟨HP, HD⟩ := HPre
@@ -228,8 +226,9 @@ theorem Decorated.verifcation_conds_correct {dec: Decorated} :
 
 
 macro "verify_one_assn": tactic => `(tactic|
-  (try simp_all) <;>
+  (try simp_all [Assertion.implies]) <;>
   (try simp_all [
+    Assertion.implies,
     Nat.eq_of_beq,
     Nat.beq_eq_true_eq,
     Nat.eq_of_beq_eq_true,
@@ -238,7 +237,6 @@ macro "verify_one_assn": tactic => `(tactic|
   (try rfl) <;>
   (try intros <;>
     (try constructor) <;>
-    (try lia) <;>
     grind [Nat.ne_of_beq_eq_false]
   )
 )
@@ -259,12 +257,12 @@ example: 1 + 1 = 2 /\ 2 * 4 < 10 /\ 4 + 4 * 5 < 25 := by
 
 
 macro "verify": tactic => `(tactic|
-  (try simp) <;>
+  (try simp [Assertion.implies]) <;>
   intros <;>
-  (try simp) <;>
+  (try simp [Assertion.implies]) <;>
   intros <;>
   apply Decorated.verifcation_conds_correct <;>
-  simp <;>
+  (try simp [Assertion.implies]) <;>
   intros <;>
   verify_assn
 )
@@ -485,7 +483,7 @@ example:
   apply And.intro
   . apply HoareTriple.consequence_pre
     . apply HoareTriple.asgn
-    . simp
+    . simp [Assertion.implies]
   . intros P' HHoare
     intros st1 HP'
     let st2 := st1.update "X" $ st1 "Y" + 1

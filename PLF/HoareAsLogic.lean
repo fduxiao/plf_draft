@@ -346,7 +346,7 @@ theorem Imp.wp.invariant b (c: Imp) (Q):
 := by
   apply HoareTriple.consequence_pre
   . apply WP.is_precondition
-  . simp [WP]
+  . simp [WP, Assertion.implies]
     intros st1 H HT st2 B12 st3 B23
     cases B23 with
     | WhileFalse HF =>
@@ -422,7 +422,7 @@ theorem Imp.complete_aux c: forall P Q,
       apply Imp.wp.invariant
     . apply WP.weakest
       apply HHoare
-    . simp [WP]
+    . simp [WP, Assertion.implies]
       intro st H HB
       apply H
       apply BigStep.WhileFalse

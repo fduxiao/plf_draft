@@ -541,12 +541,12 @@ example: Assertion := {{ #[Nat.add] X Y > #[max] Y X }}
 
 end Playground
 
-@[simp, grind]
+@[grind]
 def Assertion.implies (P Q : Assertion) : Prop := forall st, P st → Q st
 notation:26 P:26 "->>" Q:26 => (Assertion.implies P Q)
 notation:26 P:26 "<<->>" Q:26 => ((P ->> Q) ∧ (Q ->> P))
 
-@[refl, grind .]
+@[simp, refl, grind .]
 theorem Assertion.implies_refl {P : Assertion} : P ->> P := by
   intros st HP
   apply HP
@@ -852,7 +852,7 @@ example: forall (a: AExp) (n: Nat),
   . apply HoareTriple.skip
   . apply HoareTriple.consequence_pre
     . apply HoareTriple.asgn
-    . simp [Assertion.eq]
+    . simp [Assertion.implies]
 
 
 
@@ -866,7 +866,7 @@ example:
   . apply HoareTriple.asgn
   . apply HoareTriple.consequence_pre
     . apply HoareTriple.asgn
-    . simp
+    . simp [Assertion.implies]
 
 @[grind .]
 theorem HoareTriple.if {P Q} {b: BExp} {c1 c2}:
@@ -907,7 +907,7 @@ example:
       trivial
   . apply HoareTriple.consequence_pre
     . apply HoareTriple.asgn
-    . simp
+    . simp [Assertion.implies]
 
 
 example :
@@ -970,4 +970,4 @@ example:
   . apply HoareTriple.while
     apply HoareTriple.post_true
     simp
-  . simp
+  . simp [Assertion.implies]
