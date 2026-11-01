@@ -144,6 +144,12 @@ theorem Imp.wp_weakest {c: Imp} {Q P: Assertion}:
   simp [wp]
   solve_by_elim
 
+@[grind .]
+theorem Imp.wp_triple {c: Imp} {Q P: Assertion}:
+  (P ->> (c.wp Q)) →
+  {{ P }}< c >{{ Q }}
+:= by
+  grind
 
 @[simp, grind =]
 theorem Imp.wp_skip {Q: Assertion}:
@@ -199,28 +205,86 @@ theorem Assertion.ite_false {b: BExp} {P Q: Assertion}:
   . grind
 
 @[grind .]
-theorem Imp.wp_if_true {b: BExp} {c1 c2: Imp} {Q}:
+theorem Imp.wp_if_true' {b: BExp} {c1 c2: Imp} {Q}:
   {{ [<{ if b then c1 else c2 end }>.wp Q] ∧ [B| b ] }} ->> c1.wp Q
 := by
   grind
 
 @[grind .]
-theorem Imp.wp_if_false {b: BExp} {c1 c2: Imp} {Q}:
+theorem Imp.wp_if_true {b: BExp} {c1 c2: Imp} {Q}:
+  {{ [c1.wp Q] ∧ [B| b] }} ->>
+  <{ if b then c1 else c2 end }>.wp Q
+:= by
+  intro st
+  grind
+
+@[grind .]
+theorem Imp.wp_if_false' {b: BExp} {c1 c2: Imp} {Q}:
   {{ [<{ if b then c1 else c2 end }>.wp Q] ∧ ¬ [B| b ] }} ->> c2.wp Q
 := by
   grind
 
 @[grind .]
-theorem Imp.wp_while_true {b: BExp} {c: Imp} {Q: Assertion}:
+theorem Imp.wp_if_false {b: BExp} {c1 c2: Imp} {Q}:
+  {{ [c2.wp Q] ∧ ¬ [B| b] }} ->>
+  <{ if b then c1 else c2 end }>.wp Q
+:= by
+  intro st
+  grind
+
+theorem Imp.wp_if {b: BExp} {c1 c2: Imp} {P Q: Assertion}:
+  {{ [P] ∧ b }} ->> c1.wp Q →
+  {{ [P] ∧ ¬ b }} ->> c2.wp Q →
+  P ->> <{ if b then c1 else c2 end }>.wp Q
+:= by
+  grind
+
+
+@[grind .]
+theorem Imp.wp_while_true' {b: BExp} {c: Imp} {Q: Assertion}:
   {{ [<{while b do c end}>.wp Q] ∧ [B| b] }} ->> c.wp (<{while b do c end}>.wp Q)
 := by
   grind
 
 @[grind .]
-theorem Imp.wp_while_false {b: BExp} {c: Imp} {Q: Assertion}:
+theorem Imp.wp_while_true {b: BExp} {c: Imp} {Q: Assertion}:
+  {{ [c.wp (<{while b do c end}>.wp Q)] ∧ b }} ->>
+  {{ [<{while b do c end}>.wp Q] }}
+:= by
+  intro st
+  grind
+
+@[grind .]
+theorem Imp.wp_while_false' {b: BExp} {c: Imp} {Q: Assertion}:
   {{ [<{while b do c end}>.wp Q] ∧ ¬ [B| b] }} ->> Q -- i.e., (<{ skip }>.wp Q)
 := by
   grind
+
+@[grind .]
+theorem Imp.wp_while_false {b: BExp} {c: Imp} {Q: Assertion}:
+  {{ Q ∧ ¬ b }} ->>
+  {{ [<{while b do c end}>.wp Q] }}
+:= by
+  grind
+
+@[simp]
+theorem Imp.wp_while {b: BExp} {c: Imp} {P Q: Assertion}:
+  {{ [P] ∧ b }} ->> c.wp (<{while b do c end}>.wp Q) →
+  {{ [P] ∧ ¬ b }} ->> Q →
+  P ->> <{while b do c end}>.wp Q
+:= by
+  intro M1 M2 st H
+  cases E: st.beval b
+  case true =>
+    apply Imp.wp_while_true
+    specialize M1 st
+    simp at M1
+    simp_all
+  case false =>
+    apply Imp.wp_while_false
+    specialize M2 st
+    simp at M2
+    simp_all
 
 @[grind .]
 theorem Derivable.wp {c Q}:
@@ -243,18 +307,18 @@ theorem Derivable.wp {c Q}:
     . -- true
       apply Derivable.ConsequencePre
       . apply IH1
-      . apply Imp.wp_if_true
+      . apply Imp.wp_if_true'
     . -- false
       apply Derivable.ConsequencePre
       . apply IH2
-      . apply Imp.wp_if_false
+      . apply Imp.wp_if_false'
   case While b c IH =>
     apply Derivable.ConsequencePost
     . apply Derivable.While (P := ((Imp.While b c).wp Q))
       apply Derivable.ConsequencePre
       . apply IH
-      . apply Imp.wp_while_true
-    . apply Imp.wp_while_false
+      . apply Imp.wp_while_true'
+    . apply Imp.wp_while_false'
 
 @[grind .]
 theorem HoareTriple.complete {P c Q}:
