@@ -24,10 +24,8 @@ theorem HoareTriple.asgn_single {m: Nat} {X: String} {a: AExp}:
   {{ [a] == [m] }}<[X] := [a]>{{ [X] == [m] }}
 := by
   apply WP.triple
-  simp [WP.asgn_eq]
-  intro st H
-  simp at *
-  exact H
+  simp only [WP.asgn_eq]
+  simp
 
 @[grind .]
 theorem HoareTriple.asgn_fwd' {P} {m n: Nat} {X: String} {a: AExp}:

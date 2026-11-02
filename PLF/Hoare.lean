@@ -53,6 +53,42 @@ def Eval.aexp (a: AExp) : Eval Nat := fun st => st.aeval a
 theorem Eval.aexp_eval (a: AExp) (st: State):
   (Eval.aexp a) st = st.aeval a := rfl
 
+-- Each AExp should be evaluated to the corresponding Eval Nat using Eval operators
+@[simp]
+theorem Eval.aexp_num (n: Nat):
+  (Eval.aexp (AExp.Num n)) = Eval.nat n
+:= by
+  funext st
+  simp [Eval.aexp]
+
+@[simp]
+theorem Eval.aexp_var (x: String):
+  (Eval.aexp (AExp.Var x)) = Eval.var x
+:= by
+  funext st
+  simp [Eval.aexp]
+
+@[simp]
+theorem Eval.aexp_add (x y: AExp):
+  (Eval.aexp (AExp.Plus x y)) = Eval.add (Eval.aexp x) (Eval.aexp y)
+:= by
+  funext st
+  simp [Eval.aexp, Eval.add]
+
+@[simp]
+theorem Eval.aexp_sub (x y: AExp):
+  (Eval.aexp (AExp.Minus x y)) = Eval.sub (Eval.aexp x) (Eval.aexp y)
+:= by
+  funext st
+  simp [Eval.aexp, Eval.sub]
+
+@[simp]
+theorem Eval.aexp_mul (x y: AExp):
+  (Eval.aexp (AExp.Mult x y)) = Eval.mul (Eval.aexp x) (Eval.aexp y)
+:= by
+  funext st
+  simp [Eval.aexp, Eval.mul]
+
 @[grind]
 def Eval.pure {A} (x: A) : Eval A := fun _ => x
 
@@ -225,6 +261,19 @@ def Assertion := State → Prop
 section AssertionOps
 
 @[grind]
+def Assertion.pure (P: Prop) : Assertion :=
+  fun _ => P
+
+
+instance: Coe Prop Assertion where
+  coe p := Assertion.pure p
+
+
+@[simp]
+theorem Assertion.pure_eval {P: Prop} {st}:
+  Assertion.pure P st = P := rfl
+
+@[grind]
 def Assertion.eq (m n: Eval Nat) : Assertion :=
   fun st => st.eval m == st.eval n
 
@@ -232,6 +281,13 @@ def Assertion.eq (m n: Eval Nat) : Assertion :=
 theorem Assertion.eq_eval {m n: Eval Nat} {st}:
   Assertion.eq m n st = (st.eval m = st.eval n)
 := by
+  grind
+
+@[simp]
+theorem Assertion.eq_num {m n: Nat}:
+  Assertion.eq m n = (Assertion.pure <| m == n)
+:= by
+  funext st
   grind
 
 @[grind]
@@ -244,6 +300,13 @@ theorem Assertion.lg_eval {m n: Eval Nat} {st}:
 := by
   grind
 
+@[simp]
+theorem Assertion.lg_num {m n: Nat}:
+  Assertion.lg m n = (Assertion.pure <| m < n)
+:= by
+  funext st
+  grind
+
 @[grind]
 def Assertion.le (m n: Eval Nat) : Assertion :=
   fun st => st.eval m <= st.eval n
@@ -252,6 +315,13 @@ def Assertion.le (m n: Eval Nat) : Assertion :=
 theorem Assertion.le_eval {m n: Eval Nat} {st}:
   Assertion.le m n st = (st.eval m <= st.eval n)
 := by
+  grind
+
+@[simp]
+theorem Assertion.le_num {m n: Nat}:
+  Assertion.le m n = (Assertion.pure <| m <= n)
+:= by
+  funext st
   grind
 
 @[grind]
@@ -264,6 +334,13 @@ theorem Assertion.gt_eval {m n: Eval Nat} {st}:
 := by
   grind
 
+@[simp]
+theorem Assertion.gt_num {m n: Nat}:
+  Assertion.gt m n = (Assertion.pure <| m > n)
+:= by
+  funext st
+  grind
+
 @[grind]
 def Assertion.ge (m n: Eval Nat) : Assertion :=
   fun st => st.eval m >= st.eval n
@@ -274,22 +351,38 @@ theorem Assertion.ge_eval {m n: Eval Nat} {st}:
 := by
   grind
 
-@[grind]
-def Assertion.pure (P: Prop) : Assertion :=
-  fun _ => P
-
 @[simp]
-theorem Assertion.pure_eval {P: Prop} {st}:
-  Assertion.pure P st = P := rfl
+theorem Assertion.ge_num {m n: Nat}:
+  Assertion.ge m n = (Assertion.pure <| m >= n)
+:= by
+  funext st
+  grind
 
 @[grind]
 def Assertion.bexp (b: BExp) : Assertion :=
   fun st => st.beval b = true
 
+instance: Coe BExp Assertion where
+  coe b := Assertion.bexp b
+
 @[simp]
 theorem Assertion.bexp_eval {b: BExp} {st}:
   Assertion.bexp b st = (st.beval b = true)
 := by
+  grind
+
+@[simp]
+theorem Assertion.bexp_true:
+  Assertion.bexp .True = (Assertion.pure True)
+:= by
+  funext st
+  grind
+
+@[simp]
+theorem Assertion.bexp_false:
+  Assertion.bexp .False = (Assertion.pure False)
+:= by
+  funext st
   grind
 
 @[grind]
@@ -300,6 +393,13 @@ def Assertion.not (P: Assertion) : Assertion :=
 theorem Assertion.not_eval {P: Assertion} {st}:
   Assertion.not P st = ¬ P st := rfl
 
+@[simp]
+theorem Assertion.bexp_not {b: BExp}:
+  Assertion.bexp (.Not b) = Assertion.not (Assertion.bexp b)
+:= by
+  funext st
+  grind
+
 @[grind]
 def Assertion.and (P Q: Assertion) : Assertion :=
   fun st => P st ∧ Q st
@@ -307,6 +407,13 @@ def Assertion.and (P Q: Assertion) : Assertion :=
 @[simp]
 theorem Assertion.and_eval {P Q: Assertion} {st}:
   Assertion.and P Q st = (P st ∧ Q st) := rfl
+
+@[simp]
+theorem Assertion.bexp_and {b1 b2: BExp}:
+  Assertion.bexp (.And b1 b2) = Assertion.and (Assertion.bexp b1) (Assertion.bexp b2)
+:= by
+  funext st
+  grind
 
 @[simp, grind =]
 theorem Assertion.and_false {P: Assertion}:
@@ -336,9 +443,6 @@ theorem Assertion.true_and {P: Assertion}:
   funext st
   grind
 
-instance: Coe Prop Assertion where
-  coe p := Assertion.pure p
-
 @[grind]
 def Assertion.or (P Q: Assertion) : Assertion :=
   fun st => P st ∨ Q st
@@ -346,9 +450,6 @@ def Assertion.or (P Q: Assertion) : Assertion :=
 @[simp]
 theorem Assertion.or_eval {P Q: Assertion} {st}:
   Assertion.or P Q st = (P st ∨ Q st) := rfl
-
-instance: Coe BExp Assertion where
-  coe b := Assertion.bexp b
 
 end AssertionOps
 
@@ -706,7 +807,7 @@ example {m n: Nat}: {{ X + Y == [m] ![Y => [n]] ![X => 1] }} = {{ [n] + 1 == [m]
     simp
     lia
 
-example {P Q}: {{ P ∧ Q ![X => a] }} = {{ P ∧ (Q ![X => a]) }} := rfl
+example {P Q}: {{ P ∧ Q ![X => a] }} = {{ P ∧ (Q ![X => a]) }} := by rfl
 
 @[simp]
 theorem Assertion.subst_and {P Q: Assertion} {X: String} {a: AExp}:
@@ -718,29 +819,6 @@ theorem Assertion.subst_and {P Q: Assertion} {X: String} {a: AExp}:
   . intro st
     grind
 
-@[simp, grind .]
-theorem Assertion.subst_nat_eq {X: String} {m: Nat}:
-  {{ ([X] == [m]) ![[X] => [m]] }} = {{ True }}
-:= by
-  ext
-  . intro st
-    grind
-  . intro st
-    simp
-
-@[simp, grind .]
-theorem Assertion.subst_nat_neq {X Y: String} {m: Nat} {a: AExp}:
-  Y ≠ X →
-  {{ ([X] == [m]) ![[Y] => [a]] }} = {{ ([X] == [m]) }}
-:= by
-  intro N
-  ext
-  . intro st
-    simp
-    grind
-  . intro st H
-    simp_all
-
 example: {{ (X <= 5) ![X => 3] }} = {{ 3 <= 5 }} := by
   ext
   . intros st H
@@ -748,24 +826,153 @@ example: {{ (X <= 5) ![X => 3] }} = {{ 3 <= 5 }} := by
   . intros st H
     simp
 
+@[simp, grind]
+def Eval.subst {A} (e: Eval A) (X: String) (a: AExp): Eval A :=
+  fun st => e (state![X => st.aeval a; st])
+
+section EvalSubstMacros
+
+open Lean PrettyPrinter
+
+syntax lfp_eval:60 " e![ " "["term"]" " => " lfp_aexp " ]": lfp_eval
+syntax lfp_eval:60 " e![ " str " => " lfp_aexp " ]": lfp_eval
+syntax lfp_eval:60 " e![ " ident " => " lfp_aexp " ]": lfp_eval
+macro_rules
+  | `([Eval| $E e![ [$X:term] => $e ] ]) => `(Eval.subst [Eval| $E ] $X [AExp| $e])
+  | `([Eval| $E e![ $X:str => $e ] ]) => `(Eval.subst [Eval| $E ] $X [AExp| $e])
+  | `([Eval| $E e![ $X:ident => $e ] ]) =>
+    `(Eval.subst [Eval| $E ] $(Lean.quote (toString X.getId)) [AExp| $e])
+
+@[app_unexpander Eval.subst]
+def unexpanderEvalSubst : Unexpander
+  | `($_ $E $X:str $a) => do
+    let E ← termToEval E
+    let a ← termToAExp a
+    let X := mkIdent (Name.mkStr1 X.getString)
+    `([Eval| $E e![ $X:ident => $a ] ])
+  | `($_ $E $X $a) => do
+    let E ← termToEval E
+    let a ← termToAExp a
+    `([Eval| $E e![ [$X:term] => $a ] ])
+  | _ => throw ()
+
+end EvalSubstMacros
+
+example {E1 E2}: {{[E1] == [E2] e![X => a] }} = {{ [E1] == ([E2] e![X => a]) }} := by rfl
+example {E1 E2}: [Eval| [E1] + [E2] e![X => a] ] =  [Eval| [E1] + ([E2] e![X => a]) ] := by rfl
+example {E1 E2}: [Eval| ([E1] + [E2]) e![X => a] ] =  [Eval| ([E1] + [E2]) e![X => a] ] := by rfl
+
+@[simp, grind =]
+theorem Assertion.subst_beval_eq {X: String} {a: AExp} {a1 a2: AExp}:
+  {{ [B| [a1] == [a2]] ![[X] => [a]] }} = {{ [a1] e![[X] => [a]] == [a2] e![[X] => [a]] }}
+:= by
+  funext st
+  simp
+
+@[simp, grind =]
+theorem Assertion.subst_beval_le {X: String} {a: AExp} {a1 a2: AExp}:
+  {{ [B| [a1] <= [a2]] ![[X] => [a]] }} = {{ [a1] e![[X] => [a]] <= [a2] e![[X] => [a]] }}
+:= by
+  funext st
+  simp
+
+@[simp, grind =]
+theorem Assertion.subst_eq {X a} {E1 E2: Eval Nat}:
+  {{ ([E1] == [E2]) ![[X] => [a]] }} = {{ [E1] e![[X] => [a]] == [E2] e![[X] => [a]] }}
+:= by ext <;> grind
+
+@[simp, grind =]
+theorem Assertion.subst_le {X a} {E1 E2: Eval Nat}:
+  {{ ([E1] <= [E2]) ![[X] => [a]] }} = {{ [E1] e![[X] => [a]] <= [E2] e![[X] => [a]] }}
+:= by ext <;> grind
+
+@[simp, grind =]
+theorem Assertion.subst_lt {X a} {E1 E2: Eval Nat}:
+  {{ ([E1] < [E2]) ![[X] => [a]] }} = {{ [E1] e![[X] => [a]] < [E2] e![[X] => [a]] }}
+:= by ext <;> grind
+
+@[simp, grind =]
+theorem Assertion.subst_ge {X a} {E1 E2: Eval Nat}:
+  {{ ([E1] >= [E2]) ![[X] => [a]] }} = {{ [E1] e![[X] => [a]] >= [E2] e![[X] => [a]] }}
+:= by ext <;> grind
+
+@[simp, grind =]
+theorem Assertion.subst_gt {X a} {E1 E2: Eval Nat}:
+  {{ ([E1] > [E2]) ![[X] => [a]] }} = {{ [E1] e![[X] => [a]] > [E2] e![[X] => [a]] }}
+:= by ext <;> grind
+
+@[simp, grind =]
+theorem Eval.subst_pure {A} {x: A} {X: String} {a: AExp}:
+  Eval.subst (Eval.pure x) X a = Eval.pure x
+:= by
+  funext st
+  simp [Eval.subst]
+
+@[simp, grind =]
+theorem Eval.subst_num {n: Nat} {X: String} {a: AExp}:
+  Eval.subst (Eval.nat n) X a = Eval.nat n
+:= by
+  funext st
+  simp [Eval.subst]
+
+@[simp, grind =]
+theorem Eval.subst_var_eq {X: String} {a: AExp}:
+  Eval.subst (Eval.var X) X (a) = a
+:= by
+  funext st
+  simp [Eval.subst]
+
+@[simp, grind =]
+theorem Eval.subst_var_neq {X Y: String} {a: AExp}:
+  Y ≠ X →
+  Eval.subst (Eval.var X) Y a = Eval.var X
+:= by
+  intro Hneq
+  funext st
+  simp [Eval.subst]
+  apply State.update_neq
+  exact Hneq
+
+@[simp, grind =]
+theorem Eval.subst_add {X: String} {a: AExp} {E1 E2: Eval Nat}:
+  Eval.subst (Eval.add E1 E2) X a = Eval.add (Eval.subst E1 X a) (Eval.subst E2 X a)
+:= by
+  funext st
+  simp [Eval.subst]
+
+@[simp, grind =]
+theorem Eval.subst_sub {X: String} {a: AExp} {E1 E2: Eval Nat}:
+  Eval.subst (Eval.sub E1 E2) X a = Eval.sub (Eval.subst E1 X a) (Eval.subst E2 X a)
+:= by
+  funext st
+  simp [Eval.subst]
+
+@[simp, grind =]
+theorem Eval.subst_mul {X: String} {a: AExp} {E1 E2: Eval Nat}:
+  Eval.subst (Eval.mul E1 E2) X a = Eval.mul (Eval.subst E1 X a) (Eval.subst E2 X a)
+:= by
+  funext st
+  simp [Eval.subst]
+
+@[simp, grind =]
+theorem Eval.subst_app {A B} {X: String} {a: AExp} {f: Eval (A → B)} {e: Eval A}:
+  Eval.subst (Eval.app f e) X a = Eval.app (Eval.subst f X a) (Eval.subst e X a)
+:= by
+  funext st
+  simp [Eval.subst]
+
 example: {{ (X <= 5) ![X => X + 1] }} = {{ (X + 1) <= 5 }} := by
   ext
   . intros st H
     simp
     simp at H
     apply H
-  . intros st H
-    simp
-    simp at H
-    apply H
+  . simp
 
 
 example: {{ (X <= 5) ![Y => 3 + X] }} = {{ X <= 5 }} := by
-  ext
-  . intros st H
-    trivial
-  . intros st H
-    simp_all
+  simp
+  rfl
 
 @[simp, grind .]
 theorem HoareTriple.asgn {Q} {X: String} {a: AExp}:
@@ -800,22 +1007,17 @@ example : exists a: AExp,
 
 @[grind .]
 theorem HoareTriple.asgn_fwd {m: Nat} {X: String} {a} {P : Assertion}:
-  {{ P ∧ [X] == #[m] }}<[X] := [a]>{{ [
-    fun st => (
-      P state![X => m ; st] ∧
-      st X = state![X => m ; st].aeval a
-    )
-  ]}}
+  {{ P ∧ [X] == #[m] }}<[X] := [a]>{{ P ![[X] => [m]] ∧ [X] == ([a] e![[X] => [m]]) }}
 := by
   intros st1 st2 B H1
   simp at H1
   cases B with | @Asgn _ _ n _ E =>
   let ⟨HP, Exm⟩ := H1
-  have MEq: state![X => m; X => n; st1] = st1 := by
+  have MEq: state![X => m; st1] = st1 := by
     simp_all
     rw [←Exm]
     simp
-
+  simp
   rewrite [MEq]
   apply And.intro
   . apply HP
