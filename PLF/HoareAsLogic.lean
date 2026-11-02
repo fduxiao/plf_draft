@@ -269,21 +269,21 @@ theorem WP.while_false {b: BExp} {c: Imp} {Q: Assertion}:
 
 @[simp]
 theorem WP.while {b: BExp} {c: Imp} {P Q: Assertion}:
-  {{ [P] ∧ b }} ->> WP c (WP <{while b do c end}> Q) →
   {{ [P] ∧ ¬ b }} ->> Q →
+  {{ [P] ∧ b }} ->> WP c (WP <{while b do c end}> Q) →
   P ->> WP <{while b do c end}> Q
 := by
   intro M1 M2 st H
   cases E: st.beval b
   case true =>
     apply WP.while_true
-    specialize M1 st
-    simp at M1
+    specialize M2 st
+    simp at M2
     simp_all
   case false =>
     apply WP.while_false
-    specialize M2 st
-    simp at M2
+    specialize M1 st
+    simp at M1
     simp_all
 
 @[grind .]
