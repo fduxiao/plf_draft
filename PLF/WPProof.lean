@@ -11,6 +11,7 @@ def factorial (n: Nat): Imp := <{
   end
 }>
 
+@[grind]
 def Nat.factorial: Nat → Nat
   | 0 => 1
   | n + 1 => (n + 1) * Nat.factorial n
@@ -29,7 +30,7 @@ theorem HoareTriple.asgn_single {m: Nat} {X: String} {a: AExp}:
   exact H
 
 @[grind .]
-theorem HoareTriple.asgn_single' {P} {m n: Nat} {X: String} {a: AExp}:
+theorem HoareTriple.asgn_fwd' {P} {m n: Nat} {X: String} {a: AExp}:
   {{ P ∧ [X] == [m] ∧ [a] == [n] }}<[X] := [a]>{{ P ![[X] => [m]] ∧ [X] == [n] }}
 := by
   apply WP.triple
@@ -38,6 +39,10 @@ theorem HoareTriple.asgn_single' {P} {m n: Nat} {X: String} {a: AExp}:
   simp at *
   grind
 
+/--
+If you have proved a Hoare triple `{{ P1 }}< c >{{ Q1 }}`,
+you can utilize it to prove with `WP`.
+-/
 @[grind .]
 theorem WP.app_triple {P1 Q1 c P Q}:
   {{ P1 }}< c >{{ Q1 }} →
@@ -54,7 +59,7 @@ theorem WP.asgn_fwd {P Q} {m n: Nat} {X: String} {a: AExp}:
 := by
   intro M1 M2
   apply WP.app_triple
-  . apply HoareTriple.asgn_single' (m := m) (n := n) (P := P)
+  . apply HoareTriple.asgn_fwd' (m := m) (n := n) (P := P)
   . exact M1
   . exact M2
 
@@ -73,6 +78,81 @@ theorem WP.exfalso {P Q} {c: Imp}:
 := by
   grind
 
+theorem WP.add_eq (X: String) {P c Q}:
+  (forall m: Nat, {{ P ∧ [X] == [m] }} ->> WP c Q) →
+  P ->> WP c Q
+:= by
+  intro H st HP
+  apply H (st X)
+  simp
+  exact HP
+
+/--
+This is a convenient theorem to apply the loop invariant:
+```
+{{ P ∧ b }}< c >{{ P }}
+-----------------------------------------
+{{ P }}< while b do c end >{{ P ∧ ¬ b }}
+```
+-/
+@[grind .]
+theorem WP.loop_invariant {P Q} {b: BExp} {c: Imp}:
+  {{ P ∧ b }} ->> WP c P →
+  {{ P ∧ ¬b }} ->> Q →
+  P ->> WP (<{ while b do c end }>) Q
+:= by
+  intro M1 M2
+  apply WP.app_triple
+  . apply HoareTriple.while
+    apply WP.triple
+    exact M1
+  . rfl
+  . exact M2
+
+theorem factorial_correct {n: Nat}:
+  factorial_spec n (factorial n)
+:= by
+  simp [factorial_spec, factorial]
+  apply WP.triple
+  refine WP.add_eq "X" ?_; intro m1
+  rw [WP.seq_eq]
+  refine WP.asgn_fwd (m := m1) (n := n) ?_ ?_
+  . grind
+  simp; clear m1
+  rw [WP.seq_eq]
+  refine WP.add_eq "Y" ?_; intro m2
+  refine WP.asgn_fwd (m := m2) (n := 1) ?_ ?_
+  . grind
+  simp; clear m2
+  apply WP.conseq_pre
+  . show _ ->> {{ Y * (#[Nat.factorial] X) == #[Nat.factorial n]}}
+    intro st
+    simp_all
+  apply WP.loop_invariant
+  . rw [WP.seq_eq]
+    refine WP.add_eq "X" ?_; intro m1
+    refine WP.add_eq "Y" ?_; intro m2
+    refine WP.asgn_fwd (m := m2) (n := m1 * m2) ?_ ?_
+    . intro st
+      grind
+    simp
+    refine WP.asgn_fwd (m := m1) (n := m1 - 1) ?_ ?_
+    . intro st
+      grind
+    simp
+    intro st
+    simp_all
+    intros
+    let k := m1 - 1
+    have E: m1 = k + 1 := by omega
+    simp_all [Nat.factorial]
+    lia
+  intro st
+  simp
+  intro E1 E2
+  simp [Nat.factorial, E2] at E1
+  exact E1
+
 def factorial_acc: Imp := <{
   while 1 <= X do
     Y := Y * X;
@@ -84,7 +164,7 @@ def Nat.factorial_acc: Nat → Nat → Nat
   | 0, acc => acc
   | n + 1, acc => Nat.factorial_acc n ((n + 1) * acc)
 
-theorem Nat.factorial_acc_eqc {n acc: Nat}:
+theorem Nat.factorial_acc_eq {n acc: Nat}:
   Nat.factorial_acc n acc = Nat.factorial n * acc
 := by
   induction n generalizing acc
@@ -138,17 +218,18 @@ theorem factorial_acc_correct (n acc: Nat):
       ac_nf0
       rfl
 
-theorem factorial_correct_aux {n: Nat}:
-  forall m1 m2: Nat, {{ X == [m1] ∧ Y == [m2] }}< factorial n >{{ Y == [Nat.factorial n] }}
+theorem factorial_correct' {n: Nat}:
+  factorial_spec n (factorial n)
 := by
-  intro m1 m2
-  unfold factorial
+  simp [factorial_spec, factorial]
   apply WP.triple
+  refine WP.add_eq "X" ?_; intro m1
   rw [WP.seq_eq]
   refine WP.asgn_fwd (m := m1) (n := n) ?_ ?_
   . grind
   simp
   rw [WP.seq_eq]
+  refine WP.add_eq "Y" ?_; intro m2
   refine WP.asgn_fwd (m := m2) (n := 1) ?_ ?_
   . grind
   simp
@@ -156,13 +237,5 @@ theorem factorial_correct_aux {n: Nat}:
   . exact factorial_acc_correct n 1
   . intro st
     simp_all
-  . rewrite [Nat.factorial_acc_eqc]
+  . rewrite [Nat.factorial_acc_eq]
     simp
-
-theorem factorial_correct (n: Nat):
-  factorial_spec n (factorial n)
-:= by
-  unfold factorial_spec
-  intro st1 st2 S H
-  apply factorial_correct_aux (st1 "X") (st1 "Y") st1 st2 S
-  simp
