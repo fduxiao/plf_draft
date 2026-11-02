@@ -544,7 +544,6 @@ end Playground
 @[grind]
 def Assertion.implies (P Q : Assertion) : Prop := forall st, P st → Q st
 notation:26 P:26 "->>" Q:26 => (Assertion.implies P Q)
-notation:26 P:26 "<<->>" Q:26 => ((P ->> Q) ∧ (Q ->> P))
 
 @[simp, refl, grind .]
 theorem Assertion.implies_refl {P : Assertion} : P ->> P := by
@@ -660,9 +659,9 @@ def Assertion.subst (P:Assertion) (X: String) (a: AExp)
 section AssertionSubstMacros
 open Lean PrettyPrinter
 
-syntax lfp_assertion " ![ " "["term"]" " => " lfp_aexp " ]": lfp_assertion
-syntax lfp_assertion " ![ " str " => " lfp_aexp " ]": lfp_assertion
-syntax lfp_assertion " ![ " ident " => " lfp_aexp " ]": lfp_assertion
+syntax:27 lfp_assertion:27 " ![ " "["term"]" " => " lfp_aexp " ]": lfp_assertion
+syntax:27 lfp_assertion:27 " ![ " str " => " lfp_aexp " ]": lfp_assertion
+syntax:27 lfp_assertion:27 " ![ " ident " => " lfp_aexp " ]": lfp_assertion
 macro_rules
   | `({{ $P ![ [$X:term] => $e ] }}) => `(Assertion.subst {{ $P }} $X [AExp| $e])
   | `({{ $P ![ $X:str => $e ] }}) => `(Assertion.subst {{ $P }} $X [AExp| $e])
@@ -684,15 +683,59 @@ def unexpanderAssertionSubst : Unexpander
 
 end AssertionSubstMacros
 
-example: {{ (X <= 5) ![X => 3] }} <<->> {{ 3 <= 5 }} := by
-  apply And.intro
+example {m n: Nat}: {{ X + Y == [m] ![Y => [n]] ![X => 1] }} = {{ [n] + 1 == [m] }} := by
+  ext
+  . intro st
+    simp
+    lia
+  . intro st
+    simp
+    lia
+
+example {P Q}: {{ P ∧ Q ![X => a] }} = {{ P ∧ (Q ![X => a]) }} := rfl
+
+@[simp]
+theorem Assertion.subst_and {P Q: Assertion} {X: String} {a: AExp}:
+  {{ (P ∧ Q) ![[X] => [a]] }} = {{ (P ![[X] => [a]]) ∧ (Q ![[X] => [a]]) }}
+:= by
+  ext
+  . intro st
+    grind
+  . intro st
+    grind
+
+@[simp, grind .]
+theorem Assertion.subst_nat_eq {X: String} {m: Nat}:
+  {{ ([X] == [m]) ![[X] => [m]] }} = {{ True }}
+:= by
+  ext
+  . intro st
+    grind
+  . intro st
+    simp
+
+@[simp, grind .]
+theorem Assertion.subst_nat_neq {X Y: String} {m: Nat} {a: AExp}:
+  Y ≠ X →
+  {{ ([X] == [m]) ![[Y] => [a]] }} = {{ ([X] == [m]) }}
+:= by
+  intro N
+  ext
+  . intro st
+    simp
+    grind
+  . intro st H
+    simp_all
+
+example: {{ (X <= 5) ![X => 3] }} = {{ 3 <= 5 }} := by
+  ext
   . intros st H
     trivial
   . intros st H
     simp
 
-example: {{ (X <= 5) ![X => X + 1] }} <<->> {{ (X + 1) <= 5 }} := by
-  apply And.intro
+example: {{ (X <= 5) ![X => X + 1] }} = {{ (X + 1) <= 5 }} := by
+  ext
   . intros st H
     simp
     simp at H
@@ -701,6 +744,14 @@ example: {{ (X <= 5) ![X => X + 1] }} <<->> {{ (X + 1) <= 5 }} := by
     simp
     simp at H
     apply H
+
+
+example: {{ (X <= 5) ![Y => 3 + X] }} = {{ X <= 5 }} := by
+  ext
+  . intros st H
+    trivial
+  . intros st H
+    simp_all
 
 @[simp, grind .]
 theorem HoareTriple.asgn {Q} {X: String} {a: AExp}:
