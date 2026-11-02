@@ -7,6 +7,7 @@ import PLF.Equiv
 import PLF.Hoare
 import PLF.Hoare2
 import PLF.HoareAsLogic
+import PLF.WPProof
 import PLF.SmallStep
 import PLF.Types
 import PLF.Stlc

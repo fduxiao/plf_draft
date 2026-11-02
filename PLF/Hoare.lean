@@ -322,6 +322,20 @@ theorem Assertion.false_and {P: Assertion}:
   funext st
   grind
 
+@[simp, grind =]
+theorem Assertion.and_true {P: Assertion}:
+  P.and (.pure True) = P
+:= by
+  funext st
+  grind
+
+@[simp, grind =]
+theorem Assertion.true_and {P: Assertion}:
+  Assertion.and (.pure True) P = P
+:= by
+  funext st
+  grind
+
 instance: Coe Prop Assertion where
   coe p := Assertion.pure p
 
