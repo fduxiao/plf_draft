@@ -1,4 +1,5 @@
 import PLF.HoareAsLogic
+import PLF.MyTactics
 
 namespace ProofUsingWP
 
@@ -18,24 +19,63 @@ def Nat.factorial: Nat → Nat
 
 def factorial_spec (n: Nat) c := {{ True }}< c >{{ Y == [Nat.factorial n] }}
 
+trial (n: Nat): factorial_spec n (factorial n) := by
+  simp [factorial_spec, factorial]
+  apply WP.triple
+  rw [WP.seq_eq]
+  rw [WP.asgn_eq]
+  rw [←WP.asgn_eq]
+  sorry
 
 @[grind .]
-theorem HoareTriple.asgn_single {m: Nat} {X: String} {a: AExp}:
-  {{ [a] == [m] }}<[X] := [a]>{{ [X] == [m] }}
+theorem HoareTriple.asgn_single {n: Nat} {X: String} {a: AExp}:
+  {{ [a] == [n] }}<[X] := [a]>{{ [X] == [n] }}
 := by
   apply WP.triple
   simp only [WP.asgn_eq]
   simp
 
+theorem asgn_single_strongest {m n: Nat} {X: String} {a: AExp} {Q: Assertion}:
+  {{ [a] == [n] ∧ [X] == [m] }}<[X] := [a]>{{ Q }} →
+  {{ ([a] == [n]) ![[X] => [m]] ∧ [X] == [n] }} ->> Q
+:= by
+  intro M st2 H
+  simp at H
+  let st1 := state![X => m; st2]
+  have E: st2 = state![X => n; st1] := by grind
+  specialize M st1 st2
+  apply M
+  . rw [E]
+    constructor
+    grind
+  . simp
+    grind
+
 @[grind .]
 theorem HoareTriple.asgn_fwd' {P} {m n: Nat} {X: String} {a: AExp}:
-  {{ P ∧ [X] == [m] ∧ [a] == [n] }}<[X] := [a]>{{ P ![[X] => [m]] ∧ [X] == [n] }}
+  {{ P ∧ [a] == [n] ∧ [X] == [m] }}<[X] := [a]>{{ P ![[X] => [m]] ∧ [X] == [n] }}
 := by
   apply WP.triple
   simp [WP.asgn_eq]
   intro st H
   simp at *
   grind
+
+theorem asgn_fwd_strongest {m n: Nat} {X: String} {a: AExp} {P Q: Assertion}:
+  {{ P ∧ [a] == [n] ∧ [X] == [m] }}<[X] := [a]>{{ Q }} →
+  {{ (P ∧ [a] == [n]) ![[X] => [m]] ∧ [X] == [n] }} ->> Q
+:= by
+  intro M st2 H
+  simp at H
+  let st1 := state![X => m; st2]
+  have E: st2 = state![X => n; st1] := by grind
+  specialize M st1 st2
+  apply M
+  . rw [E]
+    constructor
+    grind
+  . simp
+    grind
 
 /--
 If you have proved a Hoare triple `{{ P1 }}< c >{{ Q1 }}`,
@@ -51,7 +91,7 @@ theorem WP.app_triple {P1 Q1 c P Q}:
   grind
 
 theorem WP.asgn_fwd {P Q} {m n: Nat} {X: String} {a: AExp}:
-  P ->> {{ P ∧ [X] == [m] ∧ [a] == [n] }} →
+  P ->> {{ P ∧ [a] == [n] ∧ [X] == [m] }} →
   {{ P ![[X] => [m]] ∧ [X] == [n] }} ->> Q →
   P ->> WP (<{[X] := [a] }>) Q
 := by
@@ -127,7 +167,8 @@ theorem factorial_correct {n: Nat}:
     intro st
     simp_all
   apply WP.loop_invariant
-  . rw [WP.seq_eq]
+  . -- inside the loop
+    rw [WP.seq_eq]
     refine WP.add_eq "X" ?_; intro m1
     refine WP.add_eq "Y" ?_; intro m2
     refine WP.asgn_fwd (m := m2) (n := m1 * m2) ?_ ?_
@@ -145,6 +186,7 @@ theorem factorial_correct {n: Nat}:
     have E: m1 = k + 1 := by omega
     simp_all [Nat.factorial]
     lia
+  -- after the loop
   intro st
   simp
   intro E1 E2
