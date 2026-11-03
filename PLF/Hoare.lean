@@ -19,11 +19,11 @@ theorem Eval.nat_eval (n: Nat) (st: State):
   (Eval.nat n) st = n := rfl
 
 @[grind]
-def Eval.var (x: String) : Eval Nat := fun st => st.aeval x
+def Eval.var (x: String) : Eval Nat := fun st => st x
 
 @[simp]
 theorem Eval.var_eval (x: String) (st: State):
-  (Eval.var x) st = st.aeval x := rfl
+  (Eval.var x) st = st x := rfl
 
 @[grind]
 def Eval.add (x y: Eval Nat) : Eval Nat := fun st => (st.eval x) + (st.eval y)
