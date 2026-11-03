@@ -24,7 +24,6 @@ trial (n: Nat): factorial_spec n (factorial n) := by
   apply WP.triple
   rw [WP.seq_eq]
   rw [WP.asgn_eq]
-  rw [←WP.asgn_eq]
   sorry
 
 @[grind .]
@@ -50,6 +49,15 @@ theorem asgn_single_strongest {m n: Nat} {X: String} {a: AExp} {Q: Assertion}:
     grind
   . simp
     grind
+
+theorem WP.add_eq (a: AExp) {P c Q}:
+  (forall m: Nat, {{ P ∧ [a] == [m] }} ->> WP c Q) →
+  P ->> WP c Q
+:= by
+  intro H st HP
+  apply H (st.eval a)
+  simp
+  exact HP
 
 @[grind .]
 theorem HoareTriple.asgn_fwd' {P} {m n: Nat} {X: String} {a: AExp}:
@@ -101,6 +109,23 @@ theorem WP.asgn_fwd {P Q} {m n: Nat} {X: String} {a: AExp}:
   . exact M1
   . exact M2
 
+trial {n: Nat}:
+  factorial_spec n (factorial n)
+:= by
+  simp [factorial_spec, factorial]
+  apply WP.triple
+  rw [WP.seq_eq]
+  refine WP.add_eq "X" ?_; simp; intro m1;
+  refine WP.asgn_fwd (m := m1) (n := n) ?_ ?_
+  . grind
+  simp; clear m1
+  rw [WP.seq_eq]
+  refine WP.add_eq "Y" ?_; simp; intro m2
+  refine WP.asgn_fwd (m := m2) (n := 1) ?_ ?_
+  . grind
+  simp; clear m2
+  sorry
+
 @[grind .]
 theorem WP.conseq_pre {P Q R} {c: Imp}:
   P ->> Q →
@@ -115,15 +140,6 @@ theorem WP.exfalso {P Q} {c: Imp}:
   P ->> WP c Q
 := by
   grind
-
-theorem WP.add_eq (X: String) {P c Q}:
-  (forall m: Nat, {{ P ∧ [X] == [m] }} ->> WP c Q) →
-  P ->> WP c Q
-:= by
-  intro H st HP
-  apply H (st X)
-  simp
-  exact HP
 
 /--
 This is a convenient theorem to apply the loop invariant:
@@ -152,13 +168,13 @@ theorem factorial_correct {n: Nat}:
 := by
   simp [factorial_spec, factorial]
   apply WP.triple
-  refine WP.add_eq "X" ?_; intro m1
   rw [WP.seq_eq]
+  refine WP.add_eq "X" ?_; simp; intro m1;
   refine WP.asgn_fwd (m := m1) (n := n) ?_ ?_
   . grind
   simp; clear m1
   rw [WP.seq_eq]
-  refine WP.add_eq "Y" ?_; intro m2
+  refine WP.add_eq "Y" ?_; simp; intro m2
   refine WP.asgn_fwd (m := m2) (n := 1) ?_ ?_
   . grind
   simp; clear m2
@@ -169,8 +185,8 @@ theorem factorial_correct {n: Nat}:
   apply WP.loop_invariant
   . -- inside the loop
     rw [WP.seq_eq]
-    refine WP.add_eq "X" ?_; intro m1
-    refine WP.add_eq "Y" ?_; intro m2
+    refine WP.add_eq "X" ?_; simp; intro m1
+    refine WP.add_eq "Y" ?_; simp; intro m2
     refine WP.asgn_fwd (m := m2) (n := m1 * m2) ?_ ?_
     . intro st
       grind
@@ -263,13 +279,13 @@ theorem factorial_correct' {n: Nat}:
 := by
   simp [factorial_spec, factorial]
   apply WP.triple
-  refine WP.add_eq "X" ?_; intro m1
+  refine WP.add_eq "X" ?_; simp; intro m1
   rw [WP.seq_eq]
   refine WP.asgn_fwd (m := m1) (n := n) ?_ ?_
   . grind
   simp
   rw [WP.seq_eq]
-  refine WP.add_eq "Y" ?_; intro m2
+  refine WP.add_eq "Y" ?_; simp; intro m2
   refine WP.asgn_fwd (m := m2) (n := 1) ?_ ?_
   . grind
   simp

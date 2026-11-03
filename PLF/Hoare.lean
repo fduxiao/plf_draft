@@ -385,6 +385,20 @@ theorem Assertion.bexp_false:
   funext st
   grind
 
+@[simp]
+theorem Assertion.bexp_eq {a1 a2: AExp}:
+  Assertion.bexp (.Eq a1 a2) = Assertion.eq a1 a2
+:= by
+  funext st
+  simp
+
+@[simp]
+theorem Assertion.bexp_le {a1 a2: AExp}:
+  Assertion.bexp (.Le a1 a2) = Assertion.le a1 a2
+:= by
+  funext st
+  simp
+
 @[grind]
 def Assertion.not (P: Assertion) : Assertion :=
   fun st => ¬ P st
