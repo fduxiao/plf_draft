@@ -672,7 +672,17 @@ end Playground
 
 @[grind]
 def Assertion.implies (P Q : Assertion) : Prop := forall st, P st → Q st
-notation:26 P:26 "->>" Q:26 => (Assertion.implies P Q)
+notation:26 P:26 " ->> " Q:26 => (Assertion.implies P Q)
+
+section
+open Lean PrettyPrinter
+
+@[app_unexpander Assertion.implies]
+def unexpanderAssertionImplies : Unexpander
+  | `($_ $P $Q) => `($P ->> $Q)
+  | _ => throw ()
+
+end
 
 @[simp, refl, grind .]
 theorem Assertion.implies_refl {P : Assertion} : P ->> P := by
@@ -696,6 +706,15 @@ theorem Assertion.implies_antisymm {P Q : Assertion} :
   funext x
   grind
 
+/--
+```
+yP(H) = 1 if H ->> P else ∅
+yQ(H) = 1 if H ->> Q else ∅
+```
+
+If `η ∈ Nat[yP, yQ]`, then for each `H: Assertion`, we have `η(H) : yP(H) → yQ(H)`, which is
+equivalent to say that `H ->> P` implies `H ->> Q`.
+-/
 @[grind .]
 theorem Assertion.yoneda {P Q : Assertion} :
   (forall H, H ->> P → H ->> Q) → (P ->> Q)
@@ -1116,9 +1135,10 @@ theorem HoareTriple.consequence {P1 P2 Q1 Q2 : Assertion} {c}:
 example: {{ X <= 5 }}< X := 2 * X >{{ X <= 10 }} := by
   intros st1 st2
   intros B H1
+  simp_all
   cases B with | Asgn E =>
+  simp_all
   subst E
-  simp
   apply Nat.mul_le_mul_left 2 H1
 
 
