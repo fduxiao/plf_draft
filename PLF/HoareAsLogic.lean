@@ -6,7 +6,7 @@ inductive Derivable : Assertion → Imp -> Assertion -> Prop where
   | Asgn {Q V a}:
       Derivable ({{Q ![ [V] => [a]]}}) <{[V] := [a]}> Q
   | Seq {P c Q d R}:
-      Derivable Q d R → Derivable P c Q → Derivable P <{ c; d }> R
+      Derivable P c Q → Derivable Q d R → Derivable P <{ c; d }> R
   | If {P Q} {b: BExp} {c1 c2}:
     Derivable {{ P ∧  b }} c1 Q →
     Derivable {{ P ∧ ¬b }} c2 Q →
@@ -79,7 +79,7 @@ theorem Derivable.false_pre {c Q}:
   case Skip =>
     apply Derivable.ConsequencePre .Skip .false_pre
   case Seq c1 c2 IHc1 IHc2 =>
-    apply Derivable.Seq IHc2 IHc1
+    apply Derivable.Seq IHc1 IHc2
   case Asgn X a =>
     apply Derivable.ConsequencePre .Asgn .false_pre
   case If b c1 c2 IHc1 IHc2 =>
@@ -108,8 +108,8 @@ theorem Derivable.sound {P c Q}:
     apply HoareTriple.asgn
   | Seq d1 d2 IHd1 IHd2 =>
     apply HoareTriple.seq
-    . apply IHd1
     . apply IHd2
+    . apply IHd1
   | If d1 d2 IHd1 IHd2 =>
     apply HoareTriple.if
     . apply IHd1
@@ -123,6 +123,79 @@ theorem Derivable.sound {P c Q}:
     . apply HP
     . apply HQ
 
+/-!
+An example using syntactic proof.
+-/
+
+def factorial (n: Nat): Imp := <{
+  X := [n];
+  Y := 1;
+  while 1 <= X do
+    Y := Y * X;
+    X := X - 1
+  end
+}>
+
+@[grind]
+def Nat.factorial: Nat → Nat
+  | 0 => 1
+  | n + 1 => (n + 1) * Nat.factorial n
+
+def factorial_spec (n: Nat) c := {{ True }}< c >{{ Y == [Nat.factorial n] }}
+
+example (n: Nat): factorial_spec n (factorial n) := by
+  simp [factorial_spec, factorial]
+  apply Derivable.sound
+  apply Derivable.Seq (Q := {{ X == [n]}})
+  . apply Derivable.ConsequencePre
+    apply Derivable.Asgn
+    simp
+  apply Derivable.Seq (Q := {{  X == [n] ∧ Y == 1 }})
+  . apply Derivable.ConsequencePre
+    apply Derivable.Asgn
+    simp
+  apply (flip Derivable.ConsequencePre)
+  . show _ ->> {{ Y * (#[Nat.factorial] X) == #[Nat.factorial n]}}
+    intro st
+    simp
+    simp_all
+  apply Derivable.ConsequencePost
+  . -- inside loop
+    apply Derivable.While
+    apply (flip Derivable.ConsequencePre)
+    . show _ ->> {{ Y * (#[Nat.factorial] X) == #[Nat.factorial n] ![X => X - 1] ![Y => Y * X] }}
+      simp
+      intro st
+      simp_all
+      generalize st "X" = x
+      generalize st "Y" = y
+      intros
+      let k := x - 1
+      have E: x = k + 1 := by lia
+      simp_all
+      simp_all only [Nat.factorial]
+      lia
+    apply Derivable.Seq
+    . apply Derivable.Asgn
+    apply Derivable.Asgn
+  -- after the loop
+  intro st
+  simp_all
+  generalize st "X" = x
+  generalize st "Y" = y
+  intros
+  subst x
+  simp [Nat.factorial] at *
+  assumption
+
+/-!
+What are those deriving rules? They imply the **weakest precondition** for the given command and postcondition.
+-/
+
+/--
+Weakest precondition, i.e.
+`{{ P }}< c >{{ Q }} ↔ P ->> WP c Q`
+-/
 @[grind]
 def WP (c:Imp) (Q: Assertion) : Assertion :=
   fun st1 => forall st2, st1 =[ c ]=> st2 → Q st2
@@ -150,6 +223,16 @@ theorem WP.triple {c: Imp} {Q P: Assertion}:
   {{ P }}< c >{{ Q }}
 := by
   grind
+
+/-!
+Now, We want to prove the completeness, i.e. given `{{ P }}< c >{{ Q }}`, we want to show `Derivable P c Q`.
+Since `{{ P }}< c >{{ Q }} ↔ P ->> WP c Q`, it suffices for us to prove `Derivable (WP c Q) c Q`. This complies
+with the deriving rules. For example, when `c := .Asgn X a`, the assertion `{{ Q ![ [X] => [a] ] }}` is precisely
+the **weakest precondition** for the assignment.
+
+Besides, when we want to use the _consequence rules_, what we do are often find a correct **weakest precondition**
+or a correct **loop invariant**. We also want to _calculate_ the weakest precondition automatically.
+-/
 
 @[grind =]
 theorem WP.skip_eq {Q: Assertion}:
@@ -189,6 +272,7 @@ theorem WP.if_eq {b: BExp} {c1 c2: Imp} {Q}:
     simp [Assertion.ite]
     grind
 
+@[simp, grind .]
 theorem Assertion.ite_true {b: BExp} {P Q: Assertion}:
   {{ [Assertion.ite b P Q] ∧ [B| b] }} = {{ P ∧ b}}
 := by
@@ -232,14 +316,6 @@ theorem WP.if_false {b: BExp} {c1 c2: Imp} {Q}:
   intro st
   grind
 
-theorem WP.if {b: BExp} {c1 c2: Imp} {P Q: Assertion}:
-  {{ [P] ∧ b }} ->> WP c1 Q →
-  {{ [P] ∧ ¬ b }} ->> WP c2 Q →
-  P ->> WP <{ if b then c1 else c2 end }> Q
-:= by
-  grind
-
-
 @[grind .]
 theorem WP.while_true' {b: BExp} {c: Imp} {Q: Assertion}:
   {{ [WP <{while b do c end}> Q] ∧ [B| b] }} ->> WP c (WP <{while b do c end}> Q)
@@ -267,24 +343,11 @@ theorem WP.while_false {b: BExp} {c: Imp} {Q: Assertion}:
 := by
   grind
 
-@[simp]
-theorem WP.while {b: BExp} {c: Imp} {P Q: Assertion}:
-  {{ [P] ∧ ¬ b }} ->> Q →
-  {{ [P] ∧ b }} ->> WP c (WP <{while b do c end}> Q) →
-  P ->> WP <{while b do c end}> Q
+
+theorem dup_goal {P: Prop}:
+  P → P → P
 := by
-  intro M1 M2 st H
-  cases E: st.beval b
-  case true =>
-    apply WP.while_true
-    specialize M2 st
-    simp at M2
-    simp_all
-  case false =>
-    apply WP.while_false
-    specialize M1 st
-    simp at M1
-    simp_all
+  simp
 
 @[grind .]
 theorem Derivable.wp {c Q}:
@@ -300,18 +363,31 @@ theorem Derivable.wp {c Q}:
   case Seq c1 c2 IH1 IH2 =>
     simp [WP.seq_eq]
     apply Derivable.Seq
-    . apply IH2
     . apply IH1
+    . apply IH2
   case If b c1 c2 IH1 IH2 =>
-    apply Derivable.If
-    . -- true
-      apply Derivable.ConsequencePre
-      . apply IH1
-      . apply WP.if_true'
-    . -- false
-      apply Derivable.ConsequencePre
-      . apply IH2
-      . apply WP.if_false'
+    apply dup_goal
+    . simp [WP.if_eq]
+      apply Derivable.If
+      . -- true
+        simp [Assertion.ite_true]
+        apply Derivable.ConsequencePre
+        . apply IH1
+        . grind
+      . -- false
+        simp [Assertion.ite_false]
+        apply Derivable.ConsequencePre
+        . apply IH2
+        . grind
+    . apply Derivable.If
+      . -- true
+        apply Derivable.ConsequencePre
+        . apply IH1
+        . apply WP.if_true'
+      . -- false
+        apply Derivable.ConsequencePre
+        . apply IH2
+        . apply WP.if_false'
   case While b c IH =>
     apply Derivable.ConsequencePost
     . apply Derivable.While
@@ -338,9 +414,9 @@ theorem Imp.wp.seq {P Q} {c1 c2: Imp}:
   Derivable P c1 (WP c2 Q) →
   Derivable (WP c2 Q) c2 Q →
   Derivable P <{c1; c2}> Q
-:= flip .Seq  -- fun H1 H2 => .Seq H2 H1
+:= .Seq  -- fun H1 H2 => .Seq H2 H1
 
-@[grind .]
+
 theorem Imp.wp.invariant b (c: Imp) (Q):
   {{ [ WP <{while b do c end}> Q ] ∧ b }}< c >{{ [WP <{while b do c end}> Q]}}
 := by

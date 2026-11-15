@@ -1,24 +1,6 @@
 import PLF.HoareAsLogic
 import PLF.MyTactics
 
-namespace ProofUsingWP
-
-def factorial (n: Nat): Imp := <{
-  X := [n];
-  Y := 1;
-  while 1 <= X do
-    Y := Y * X;
-    X := X - 1
-  end
-}>
-
-@[grind]
-def Nat.factorial: Nat → Nat
-  | 0 => 1
-  | n + 1 => (n + 1) * Nat.factorial n
-
-def factorial_spec (n: Nat) c := {{ True }}< c >{{ Y == [Nat.factorial n] }}
-
 trial (n: Nat): factorial_spec n (factorial n) := by
   simp [factorial_spec, factorial]
   apply WP.triple
@@ -109,6 +91,79 @@ trial {n: Nat}:
   apply WP.asgn_fwd; simp
   sorry
 
+theorem WP.if {b: BExp} {c1 c2: Imp} {P Q: Assertion}:
+  {{ [P] ∧ b }} ->> WP c1 Q →
+  {{ [P] ∧ ¬ b }} ->> WP c2 Q →
+  P ->> WP <{ if b then c1 else c2 end }> Q
+:= by
+  grind
+
+theorem WP.while {b: BExp} {c: Imp} {P Q: Assertion}:
+  -- If we write `I := WP <{while b do c end}> Q`
+  {{ P ∧ b }} ->> WP c (WP <{while b do c end}> Q) → -- then this is `{{ I ∧ b }}`
+  {{ P ∧ ¬ b }} ->> Q → -- and this is `{{ I ∧ ¬ b }}`
+  P ->> WP <{while b do c end}> Q
+:= by
+  intro M1 M2 st H
+  cases E: st.beval b
+  case true =>
+    apply WP.while_true
+    specialize M1 st
+    simp at M1
+    simp_all
+  case false =>
+    apply WP.while_false
+    specialize M2 st
+    simp at M2
+    simp_all
+
+theorem WP.invariant {b c Q}:
+  {{ [ WP <{while b do c end}> Q ] ∧ b }}< c >{{ [WP <{while b do c end}> Q]}}
+:= by
+  apply WP.triple
+  grind
+
+theorem WP.imp_while_eq {b: BExp} {c: Imp} {P Q: Assertion}:
+  P ->> WP <{while b do c end}> Q ↔
+  ∃ I: Assertion, (P ->> I) ∧ ({{ I ∧ b }} ->> WP c I) ∧ ({{ I ∧ ¬ b }} ->> Q)
+:= by
+  apply Iff.intro
+  . intro H
+    exists WP <{while b do c end}> Q
+    and_intros
+    . exact H
+    . grind
+    . grind
+  . simp
+    intro I M HT HF
+    apply WP.weakest
+    apply HoareTriple.consequence _ M HF
+    apply HoareTriple.while
+    apply WP.triple
+    exact HT
+
+/--
+This is a convenient theorem to apply the loop invariant:
+```
+{{ P ∧ b }}< c >{{ P }}
+-----------------------------------------
+{{ P }}< while b do c end >{{ P ∧ ¬ b }}
+```
+-/
+@[grind .]
+theorem WP.loop_invariant {I Q} {b: BExp} {c: Imp}:
+  {{ I ∧ b }} ->> WP c I →
+  {{ I ∧ ¬b }} ->> Q →
+  I ->> WP (<{ while b do c end }>) Q
+:= by
+  intro M1 M2
+  apply WP.app_triple
+  . apply HoareTriple.while
+    apply WP.triple
+    exact M1
+  . rfl
+  . exact M2
+
 @[grind .]
 theorem WP.conseq_pre {P Q R} {c: Imp}:
   P ->> Q →
@@ -123,28 +178,6 @@ theorem WP.exfalso {P Q} {c: Imp}:
   P ->> WP c Q
 := by
   grind
-
-/--
-This is a convenient theorem to apply the loop invariant:
-```
-{{ P ∧ b }}< c >{{ P }}
------------------------------------------
-{{ P }}< while b do c end >{{ P ∧ ¬ b }}
-```
--/
-@[grind .]
-theorem WP.loop_invariant {P Q} {b: BExp} {c: Imp}:
-  {{ P ∧ b }} ->> WP c P →
-  {{ P ∧ ¬b }} ->> Q →
-  P ->> WP (<{ while b do c end }>) Q
-:= by
-  intro M1 M2
-  apply WP.app_triple
-  . apply HoareTriple.while
-    apply WP.triple
-    exact M1
-  . rfl
-  . exact M2
 
 theorem factorial_correct {n: Nat}:
   factorial_spec n (factorial n)
@@ -212,20 +245,19 @@ theorem factorial_acc_correct (n acc: Nat):
     simp [factorial_acc]
     apply WP.triple
     apply WP.while
-    . intro st
-      simp [Nat.factorial_acc]
-      simp_all
-    . apply WP.exfalso
+    . -- inside the loop
+      apply WP.exfalso
       intro st
       simp_all
+    -- after the loop
+    intro st
+    simp [Nat.factorial_acc]
+    simp_all
   case succ n IH =>
     simp [factorial_acc]
     apply WP.triple
     apply WP.while
-    . -- false
-      intro st
-      simp_all
-    . -- true
+    . -- inside the loop
       rw [WP.seq_eq]
       apply WP.asgn_fwd; simp; intro y
       apply WP.conseq_pre
@@ -243,6 +275,9 @@ theorem factorial_acc_correct (n acc: Nat):
       simp [Nat.factorial_acc]
       ac_nf0
       rfl
+    -- after the loop
+    intro st
+    simp_all
 
 theorem factorial_correct' {n: Nat}:
   factorial_spec n (factorial n)

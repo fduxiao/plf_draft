@@ -255,7 +255,7 @@ example: [Eval| #[Nat.add] [some_eval] 2 ] test_state = 6 := by rfl
 
 end Playground
 
-@[simp, grind]
+@[grind]
 def Assertion := State → Prop
 
 section AssertionOps
@@ -1011,7 +1011,6 @@ example: {{ (X <= 5) ![X => X + 1] }} = {{ (X + 1) <= 5 }} := by
 
 example: {{ (X <= 5) ![Y => 3 + X] }} = {{ X <= 5 }} := by
   simp
-  rfl
 
 @[simp, grind .]
 theorem HoareTriple.asgn {Q} {X: String} {a: AExp}:
