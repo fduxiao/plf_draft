@@ -935,6 +935,12 @@ theorem Assertion.subst_gt {X a} {E1 E2: Eval Nat}:
 := by ext <;> grind
 
 @[simp, grind =]
+theorem Assertion.subst_pure {X: String} {a: AExp} {P: Prop}:
+  {{ [P] ![[X] => [a]] }} = {{ P }}
+:= by
+  ext <;> grind
+
+@[simp, grind =]
 theorem Eval.subst_pure {A} {x: A} {X: String} {a: AExp}:
   Eval.subst (Eval.pure x) X a = Eval.pure x
 := by
@@ -1058,10 +1064,12 @@ theorem HoareTriple.asgn_fwd {m: Nat} {X: String} {a} {P : Assertion}:
     simp
 
 @[grind .]
-theorem HoareTriple.asgn_fwd_exists a {X: String} {P: Assertion}:
+theorem HoareTriple.asgn_fwd_exists' {a} {X: String} {P: Assertion}:
   {{ P }}< [X] := [a] >{{ [
-    fun st => ∃ m, P state![X => m ; st] ∧
-                st X = state![X => m ; st].aeval a
+    fun st =>
+      ∃ m, P state![X => m ; st]
+      ∧
+      st X = state![X => m ; st].aeval a
   ] }}
 := by
   intros st1 st2 B HP
@@ -1073,6 +1081,49 @@ theorem HoareTriple.asgn_fwd_exists a {X: String} {P: Assertion}:
   . simp
     symm
     exact E
+
+@[grind]
+def Assertion.exists {α} (P: α → Assertion) : Assertion :=
+  fun st => ∃ x, P x st
+
+@[simp]
+theorem Assertion.exists_eval {α} {P: α → Assertion} {st}:
+  Assertion.exists P st = (∃ x, P x st)
+:= rfl
+
+section AssertionExistsMacros
+open Lean
+syntax "∃" explicitBinders ", " lfp_assertion : lfp_assertion
+
+macro_rules
+| `({{ ∃ $b, $Q }}) => do
+  let Q ← `({{ $Q }})
+  expandExplicitBinders ``Assertion.exists b Q
+
+@[app_unexpander Assertion.exists]
+def Assertion.exists.unexpander : Lean.PrettyPrinter.Unexpander
+  | `($_ fun $x:ident => $Q) => do
+    match ← termToAssertion Q with
+    | `(lfp_assertion| ∃ $[$y:ident]*, $Q) => `({{ ∃ $x:ident $[$y:ident]*, $Q}})
+    | Q => `({{ ∃ $x:ident, $Q}})
+  | _ => throw ()
+
+end AssertionExistsMacros
+
+@[grind .]
+theorem HoareTriple.asgn_fwd_exists {a} {X: String} {P: Assertion}:
+  {{ P }}< [X] := [a] >{{ ∃ m: Nat, P ![ [X] => [m] ] ∧ [X] == ([a] e![[X] => [m]]) }}
+:= by
+  unfold Assertion.exists
+  simp
+  exact HoareTriple.asgn_fwd_exists'
+
+@[simp, grind =]
+theorem Assertion.exists_implies {α} {P: α → Assertion} {Q: Assertion}:
+  Assertion.exists P ->> Q ↔
+  ∀ x, P x ->> Q
+:= by
+  grind
 
 @[grind .]
 theorem HoareTriple.consequence_pre {P1 P2 Q : Assertion} {c}:
